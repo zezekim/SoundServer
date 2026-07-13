@@ -7,14 +7,20 @@ import re
 import signal
 import threading
 import json
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 
-app = Flask(__name__)
-app.secret_key = '***REMOVED-SECRET***'
+# Load secrets/config from a .env file (repo root or CWD). See .env.example.
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, '.env'))
 
-# --- Configuration ---
-SERIAL_PORT = "/dev/ttyS0"
-BAUD_RATE = 115200
+app = Flask(__name__)
+app.secret_key = os.environ.get('CALL_FLASK_SECRET_KEY') or os.urandom(32).hex()
+
+# --- Configuration (env-overridable; see .env.example) ---
+SERIAL_PORT = os.environ.get('CALL_SERIAL_PORT', "/dev/ttyS0")
+BAUD_RATE = int(os.environ.get('CALL_BAUD_RATE', 115200))
+WEB_PORT = int(os.environ.get('CALL_WEB_PORT', 5020))
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "call_config.json")
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 CHIME_WAV_PATH = os.path.join(PROJECT_DIR, "chime.wav")
@@ -352,4 +358,4 @@ if __name__ == "__main__":
     modem_thread = threading.Thread(target=start_modem_listener, daemon=True)
     modem_thread.start()
     print("Modem listener thread started. Starting Flask web server...")
-    app.run(host='0.0.0.0', port=5020, debug=False)
+    app.run(host='0.0.0.0', port=WEB_PORT, debug=False)

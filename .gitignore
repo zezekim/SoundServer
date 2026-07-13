@@ -23,6 +23,7 @@ index.html.bk.working
 app.py.working.*
 
 # --- Secrets & TLS material (DO NOT COMMIT) ---
+.env
 *.pem
 api_keys.json
 api_keys.txt
@@ -50,3 +51,4 @@ tts_log.txt
 call/chime_mono.wav
 call/test_capture.wav
 test/
+*.pre-redesign

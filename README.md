@@ -100,6 +100,24 @@ the connection state changes (and repeats the disconnect chime while down).
 
 ## Setup
 
+### 1. Configuration (`.env`)
+
+Secrets and host-specific settings are read from a `.env` file at the repo root
+(loaded via `python-dotenv`). Copy the template and fill it in:
+
+```bash
+cp .env.example .env
+# generate strong secrets:
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+`.env` is **git-ignored** — never commit it. All three services read from it
+(`FLASK_SECRET_KEY`, `DEFAULT_API_KEY`, serial ports, folder paths, web ports,
+optional SIM PIN). Every value has a sensible default, so the apps still start if
+`.env` is missing (a random session key is generated per run in that case).
+
+### 2. Run the services
+
 Each service has its own virtual environment in the original deployment. To run
 from a clean checkout:
 
@@ -107,21 +125,21 @@ from a clean checkout:
 # Sound Server
 cd flask-env
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r ../requirements.txt          # Flask, gTTS, pydub, gunicorn, ...
+pip install -r ../requirements.txt          # Flask, gTTS, pydub, gunicorn, dotenv, ...
 python app.py                                # dev server on :5000
 # or: gunicorn -c gunicorn_config.py app:app
 
-# SMS Gateway / Call Intercom (need pyserial + Flask)
+# SMS Gateway / Call Intercom (need pyserial + Flask + dotenv)
 cd ../sms   # or ../call
 python3 -m venv .venv && source .venv/bin/activate
-pip install flask pyserial
+pip install flask pyserial python-dotenv
 python sms.py     # :5010   /   python call.py  (:5020)
 ```
 
 The top-level `requirements.txt` captures the Sound Server's full environment
 (note it also pins several `google-cloud-*` / `google-genai` packages from
-earlier TTS experiments; only Flask, gTTS, pydub, and gunicorn are needed to run
-`app.py`).
+earlier TTS experiments; only Flask, gTTS, pydub, python-dotenv, and gunicorn are
+needed to run `app.py`).
 
 ### Preparing sounds
 
@@ -151,13 +169,14 @@ adjusted for a new host:
 ⚠️ This project was written for a trusted LAN and is **not hardened for public
 exposure**:
 
-- Flask `secret_key`, a `DEFAULT_API_KEY`, and TLS `key.pem`/`cert.pem` were
-  present in the working tree. These are **git-ignored** here and should be
-  **rotated** — treat any value that was ever committed as compromised.
+- Secrets (`FLASK_SECRET_KEY`, `DEFAULT_API_KEY`, SIM PIN, etc.) now load from a
+  git-ignored `.env` file — see [Setup](#1-configuration-env). No secrets are
+  hard-coded in the source. TLS `key.pem`/`cert.pem` are also git-ignored.
+- Any secret that was committed in earlier history is **compromised and must be
+  rotated** — generate fresh values into your `.env`.
 - The web servers bind to `0.0.0.0` with no authentication on the play/SMS
   endpoints. Keep them behind a firewall / VPN and do not expose them to the
   internet.
-- Provide real secrets via environment variables or an un-tracked config file.
 
 ## Repository layout
 

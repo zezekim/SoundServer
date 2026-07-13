@@ -11,16 +11,21 @@ import queue
 import json
 from collections import deque
 from datetime import datetime
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template_string, Response
 
-# --- Configuration ---
-SERIAL_PORT = '/dev/ttyS0'
-BAUD_RATE = 115200
-WEB_PORT = 5010
-PIN_CODE = None
+# Load secrets/config from a .env file (repo root or CWD). See .env.example.
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, '.env'))
+
+# --- Configuration (env-overridable; see .env.example) ---
+SERIAL_PORT = os.environ.get('SMS_SERIAL_PORT', '/dev/ttyS0')
+BAUD_RATE = int(os.environ.get('SMS_BAUD_RATE', 115200))
+WEB_PORT = int(os.environ.get('SMS_WEB_PORT', 5010))
+PIN_CODE = os.environ.get('SMS_PIN_CODE') or None
 MAX_MESSAGES = 100
 CSV_FILE = 'received_sms.csv'
-PHONE_NUMBER_MANUAL = None
+PHONE_NUMBER_MANUAL = os.environ.get('SMS_PHONE_NUMBER') or None
 # ---------------------
 
 # --- Logging Setup ---

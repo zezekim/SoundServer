@@ -8,22 +8,28 @@ import tempfile
 import threading
 import queue
 import uuid
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from werkzeug.utils import secure_filename
 from gtts import gTTS
 from pydub import AudioSegment
 
+# Load secrets/config from a .env file (repo root or CWD). See .env.example.
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, '.env'))
+
 app = Flask(__name__)
 
-# --- Configuration ---
-SOUND_FOLDER = '/home/rs/flask-env/wav'
-TTS_CACHE_FOLDER = '/home/rs/flask-env/tts_cache'
+# --- Configuration (env-overridable; see .env.example) ---
+SOUND_FOLDER = os.environ.get('SOUND_FOLDER', '/home/rs/flask-env/wav')
+TTS_CACHE_FOLDER = os.environ.get('TTS_CACHE_FOLDER', '/home/rs/flask-env/tts_cache')
 DEVICE_LABELS_FILE = 'devices.json'
 CATEGORIES_FILE = 'categories.json'
 FFMPEG_PATH = '/usr/bin/ffmpeg'
 AMIXER_PATH = '/usr/bin/amixer'
-app.secret_key = '***REMOVED-SECRET***'
-DEFAULT_API_KEY = '***REMOVED-SECRET***'
+app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(32).hex()
+DEFAULT_API_KEY = os.environ.get('DEFAULT_API_KEY', '')
+SERVER_PORT = int(os.environ.get('SOUND_SERVER_PORT', 5000))
 REPEAT_DELAY_SECONDS = 0.2
 MAX_REPEAT_COUNT = 20
 
@@ -302,5 +308,5 @@ if __name__ == '__main__':
     for f in [DEVICE_LABELS_FILE, CATEGORIES_FILE]:
         if not os.path.exists(f):
             with open(f, 'w') as fh: fh.write('{}')
-    print("Starting Flask server for development on http://0.0.0.0:5000")
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    print(f"Starting Flask server for development on http://0.0.0.0:{SERVER_PORT}")
+    app.run(host='0.0.0.0', port=SERVER_PORT, debug=False, use_reloader=False)

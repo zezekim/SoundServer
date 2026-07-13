@@ -1,430 +1,633 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="auto">
 <head>
-    <title>Sound Server Control Panel</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SoundServer · Control Panel</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; background-color: #f9f9f9; display: flex; gap: 20px; }
-        .main-content { flex: 3; }
-        .sidebar { flex: 1; min-width: 350px; }
-        h2, h3 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 25px; }
-        .section { background-color: #fff; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        #categories-container { display: flex; flex-direction: column; gap: 15px; }
-        .category { background-color: #f0f0f0; border: 1px solid #ddd; border-radius: 5px; padding: 10px; min-height: 80px; }
-        .category-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: move; background-color: #e9e9e9; padding: 5px 10px; border-radius: 3px;}
-        .category-header h3 { margin: 0; font-size: 1.1em; border: none; }
-        .category-controls button { margin-left: 5px; font-size: 0.8em; padding: 3px 6px; }
-        .category-list { list-style: none; padding: 0; margin: 0; min-height: 40px; background-color: #fff; border-radius: 3px; padding: 5px; }
-        .sound-file-item { display: flex; justify-content: space-between; align-items: center; background-color: #fff; border: 1px solid #eee; padding: 8px 12px; margin-bottom: 5px; border-radius: 4px; cursor: grab; }
-        .sound-file-item:hover { background-color: #f5f5f5; }
-        .sound-file-item .file-name { font-weight: bold; flex-grow: 1; }
-        .sound-file-item .play-buttons { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
-        .file-controls { display: flex; align-items: center; gap: 5px; margin-left: 10px; }
-        .play-btn { background-color: #5cb85c; color: white; border-color: #4cae4c; padding: 4px 8px; font-size: 13px; cursor: pointer; border: 1px solid; border-radius: 3px; transition: background-color 0.2s; }
-        .play-btn:disabled { background-color: #aaa; border-color: #999; cursor: not-allowed; }
-        .delete-btn { color: white; background-color: #d9534f; border-color: #d43f3a;padding: 4px 8px; font-size: 13px; cursor: pointer; border: 1px solid; border-radius: 3px;}
-        .rename-btn { background-color: #f0ad4e; color: white; border-color: #eea236;padding: 4px 8px; font-size: 13px; cursor: pointer; border: 1px solid; border-radius: 3px;}
-        .sortable-ghost { opacity: 0.4; background-color: #a0d3ff; }
-        .controls-bar { margin-bottom: 15px; }
-        button, input[type="submit"] { padding: 8px 15px; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; transition: filter 0.2s; }
-        button:disabled { filter: brightness(0.7); cursor: not-allowed; }
-        #add-category-btn { background-color: #5cb85c; }
-        #save-layout-btn { background-color: #6c757d; }
-        .btn-danger { background-color: #d9534f !important; }
-        .form-section label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-section input, .tts-section textarea, .tts-section select { width: calc(100% - 22px); padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 3px; }
-        .tts-section textarea { min-height: 60px; resize: vertical; }
-        .tts-section select { width: 100%; background-color: white; }
-        .repeat-count { width: 45px; padding: 4px; font-size: 13px; text-align: center; border: 1px solid #ccc; border-radius: 3px; margin-right: 5px; }
-        #volume-controls-section .card-volume-controls { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
-        #volume-controls-section .card-volume-controls:last-child { border-bottom: none; }
-        #volume-controls-section h4 { margin-top: 0; margin-bottom: 8px; font-size: 1em; color: #555; }
-        .mixer-control { display: flex; align-items: center; margin-bottom: 5px; gap: 8px; }
-        .mixer-control label { min-width: 100px; font-size: 0.9em; }
-        .mixer-control input[type="range"] { flex-grow: 1; }
-        .mixer-control .volume-display { min-width: 35px; text-align: right; font-size: 0.9em; }
-        .mixer-control .no-volume-info { font-style: italic; color: #888; }
-        #toast-notification { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-size: 1.1em; z-index: 1000; opacity: 0; visibility: hidden; transform: translateY(-20px); transition: opacity 0.3s, visibility 0.3s, transform 0.3s; }
-        #toast-notification.show { opacity: 1; visibility: visible; transform: translateY(0); }
-        #toast-notification.success { background-color: #5cb85c; }
-        #toast-notification.error { background-color: #d9534f; }
+        :root {
+            --bg: #f4f6fb; --surface: #ffffff; --surface-2: #f0f2f7; --border: #e2e6ef;
+            --text: #1c2333; --muted: #6b7385; --brand: #4f6bed; --brand-ink: #ffffff;
+            --green: #22a06b; --amber: #d9880f; --red: #d64545; --shadow: 0 1px 3px rgba(20,30,60,.08), 0 6px 20px rgba(20,30,60,.06);
+            --radius: 12px;
+        }
+        :root[data-theme="dark"] {
+            --bg: #0f1420; --surface: #171d2b; --surface-2: #1f2637; --border: #2a3348;
+            --text: #e7ebf3; --muted: #9aa3b8; --brand: #6a83f5; --brand-ink: #0f1420;
+            --green: #34c184; --amber: #e6a23c; --red: #f06868; --shadow: 0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root[data-theme="auto"] {
+                --bg: #0f1420; --surface: #171d2b; --surface-2: #1f2637; --border: #2a3348;
+                --text: #e7ebf3; --muted: #9aa3b8; --brand: #6a83f5; --brand-ink: #0f1420;
+                --green: #34c184; --amber: #e6a23c; --red: #f06868; --shadow: 0 1px 3px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+            }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 15px; line-height: 1.45; }
+        button, input, select, textarea { font: inherit; color: inherit; }
+        a { color: var(--brand); }
+
+        /* --- Header --- */
+        header { position: sticky; top: 0; z-index: 50; background: var(--surface);
+            border-bottom: 1px solid var(--border); box-shadow: var(--shadow); }
+        .header-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+            padding: 12px 20px; max-width: 1400px; margin: 0 auto; }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; margin-right: auto; }
+        .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 22%, transparent); }
+        .ctl { display: flex; flex-direction: column; gap: 3px; }
+        .ctl label { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+        .ctl select, .ctl input, .search input { background: var(--surface-2); border: 1px solid var(--border);
+            border-radius: 8px; padding: 7px 10px; min-width: 60px; }
+        .search { position: relative; }
+        .search input { width: 220px; padding-left: 30px; }
+        .search::before { content: "🔍"; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: .8rem; opacity: .6; }
+        .icon-btn { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+            width: 38px; height: 38px; cursor: pointer; font-size: 1.05rem; align-self: end; }
+        .icon-btn:hover { border-color: var(--brand); }
+
+        /* --- Layout --- */
+        main { max-width: 1400px; margin: 0 auto; padding: 20px; display: grid;
+            grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
+        @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+            box-shadow: var(--shadow); }
+        .panel-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+        .panel-head h2 { margin: 0; font-size: 1rem; }
+        .panel-head .spacer { margin-left: auto; }
+        .panel-body { padding: 16px 18px; }
+
+        /* --- Buttons --- */
+        .btn { border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+            padding: 8px 14px; border-radius: 9px; cursor: pointer; font-weight: 600; font-size: .88rem;
+            display: inline-flex; align-items: center; gap: 6px; transition: filter .15s, transform .05s; }
+        .btn:hover:not(:disabled) { filter: brightness(1.04); }
+        .btn:active:not(:disabled) { transform: translateY(1px); }
+        .btn:disabled { opacity: .55; cursor: not-allowed; }
+        .btn-primary { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
+        .btn-green { background: var(--green); color: #fff; border-color: transparent; }
+        .btn-ghost { background: transparent; }
+        .btn-danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
+        .btn-sm { padding: 5px 9px; font-size: .8rem; }
+
+        /* --- Soundboard --- */
+        .board-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+        .board-toolbar .hint { color: var(--muted); font-size: .82rem; }
+        #categories-container { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+        .category { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .category.empty-hidden { display: none; }
+        .category-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+            background: color-mix(in srgb, var(--brand) 8%, var(--surface-2)); }
+        .category-header h3 { margin: 0; font-size: .95rem; font-weight: 700; outline: none; }
+        .category-header h3[contenteditable="true"]:focus { background: var(--surface); border-radius: 5px; padding: 1px 6px; }
+        .category-count { color: var(--muted); font-size: .78rem; font-weight: 600; }
+        .category-controls { margin-left: auto; display: flex; gap: 6px; }
+        .drag-handle { cursor: grab; color: var(--muted); display: none; }
+        .tile-grid { list-style: none; margin: 0; padding: 12px; display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; min-height: 20px; }
+        .tile { display: flex; align-items: center; gap: 10px; background: var(--surface);
+            border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+        .tile.hidden { display: none; }
+        .tile-play { flex-shrink: 0; width: 38px; height: 38px; border-radius: 9px; border: none; cursor: pointer;
+            background: var(--green); color: #fff; font-size: 1rem; display: grid; place-items: center; }
+        .tile-play:disabled { opacity: .6; cursor: default; }
+        .tile-name { flex-grow: 1; font-weight: 600; font-size: .86rem; word-break: break-word; }
+        .tile-actions { display: none; gap: 4px; }
+        .tile-actions .icon { background: transparent; border: none; cursor: pointer; font-size: .95rem; padding: 3px; border-radius: 6px; }
+        .tile-actions .icon:hover { background: var(--surface-2); }
+        body.edit-mode .tile { cursor: grab; }
+        body.edit-mode .tile-actions { display: flex; }
+        body.edit-mode .drag-handle { display: inline; }
+        body.edit-mode .tile-play { pointer-events: none; opacity: .5; }
+        .sortable-ghost { opacity: .4; }
+        .sortable-chosen { box-shadow: 0 0 0 2px var(--brand); }
+
+        /* --- Sidebar tabs --- */
+        .tabs { display: flex; gap: 4px; padding: 8px 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+        .tab { background: transparent; border: none; padding: 9px 12px; cursor: pointer; border-radius: 8px 8px 0 0;
+            font-weight: 600; font-size: .85rem; color: var(--muted); }
+        .tab.active { color: var(--text); background: var(--surface-2); }
+        .tab-panel { display: none; padding: 16px 18px; }
+        .tab-panel.active { display: block; }
+        .field { margin-bottom: 12px; }
+        .field label { display: block; font-size: .8rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+        .field input, .field select, .field textarea { width: 100%; background: var(--surface-2);
+            border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; }
+        .field textarea { min-height: 70px; resize: vertical; }
+        .full { width: 100%; justify-content: center; }
+
+        /* --- Volume --- */
+        .vol-card { padding: 10px 0; border-bottom: 1px dashed var(--border); }
+        .vol-card:last-child { border-bottom: none; }
+        .vol-card h4 { margin: 0 0 8px; font-size: .88rem; }
+        .mixer { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+        .mixer label { min-width: 90px; font-size: .8rem; color: var(--muted); }
+        .mixer input[type=range] { flex-grow: 1; accent-color: var(--brand); }
+        .mixer .val { min-width: 40px; text-align: right; font-size: .8rem; font-variant-numeric: tabular-nums; }
+
+        /* --- Toast --- */
+        #toast { position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 20px);
+            background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 10px; font-weight: 600;
+            box-shadow: var(--shadow); opacity: 0; visibility: hidden; transition: all .25s; z-index: 999; max-width: 90vw; }
+        #toast.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+        #toast.success { background: var(--green); color: #fff; }
+        #toast.error { background: var(--red); color: #fff; }
+        .empty-state { color: var(--muted); text-align: center; padding: 24px; font-size: .9rem; }
+        code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: .85em; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 </head>
 <body>
+    <header>
+        <div class="header-row">
+            <div class="brand"><span class="dot"></span>🔊 SoundServer</div>
+            <div class="ctl">
+                <label for="active-speaker">▶ Play to</label>
+                <select id="active-speaker"><option value="">No speaker</option></select>
+            </div>
+            <div class="ctl">
+                <label for="active-bg">Background bed</label>
+                <select id="active-bg"><option value="">— None —</option></select>
+            </div>
+            <div class="ctl">
+                <label for="repeat-count">Repeat</label>
+                <input type="number" id="repeat-count" value="1" min="1" max="20">
+            </div>
+            <div class="ctl search">
+                <label class="sr-only" for="sound-search">Search</label>
+                <input type="text" id="sound-search" placeholder="Search sounds…" autocomplete="off">
+            </div>
+            <button class="icon-btn" id="theme-toggle" title="Toggle light / dark">🌓</button>
+        </div>
+    </header>
 
-    <div class="main-content">
-        <div class="section">
-            <h2>Sound Files & Categories</h2>
-            <div class="controls-bar">
-                <button id="add-category-btn">Add New Category</button>
-                <button id="save-layout-btn">Save Layout & Labels</button>
+    <main>
+        <!-- Soundboard -->
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Soundboard</h2>
+                <span class="category-count" id="library-stats"></span>
+                <div class="spacer"></div>
+                <button class="btn btn-sm" id="edit-toggle">✎ Edit layout</button>
+                <button class="btn btn-sm" id="add-category-btn" style="display:none">＋ Category</button>
+                <button class="btn btn-sm btn-primary" id="save-layout-btn" style="display:none">💾 Save</button>
             </div>
-            <div id="categories-container"></div>
-            <div class="category" id="unassigned-category" data-category-name="Unassigned">
-                <div class="category-header"><h3>Unassigned Files</h3></div>
-                <ul class="category-list" id="unassigned-list"></ul>
-            </div>
-        </div>
-    </div>
-
-    <div class="sidebar">
-        <div class="section tts-section">
-            <h2>Text-to-Speech</h2>
-            <div id="tts-controls">
-                <label for="tts-text">Text to Speak:</label>
-                <textarea id="tts-text" placeholder="Type something to say..."></textarea>
-                <label for="tts-speaker-select">Select Speaker:</label>
-                <select id="tts-speaker-select"><option value="">--Loading Speakers--</option></select>
-                <label for="tts-background-select">Background Sound (Optional):</label>
-                <select id="tts-background-select"><option value="">-- None --</option></select>
-                <button id="speak-btn" style="width: 100%; background-color: #337ab7;">Speak</button>
-            </div>
-        </div>
-        <div class="section form-section">
-            <h2>Upload File</h2>
-            <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
-                <label for="file_upload">Upload WAV or MP3 file:</label>
-                <input type="file" id="file_upload" name="file" accept=".wav,.mp3">
-                <input type="submit" value="Upload File" style="background-color: #007bff;">
-            </form>
-        </div>
-        <div class="section" id="volume-controls-section">
-            <h2>Volume Controls</h2>
-            <div id="volume-controls-container"><p>Loading volume controls...</p></div>
-        </div>
-        <div class="section form-section">
-            <h2>Speaker Card Labels</h2>
-            <form id="speaker-labels-form">
-                {% if cards_for_labeling %}
-                    <div class="form-field-group">
-                    {% for card_info in cards_for_labeling %}
-                        <div>
-                            <label for="label_for_card_{{ card_info.card_index }}">{{ card_info.default_name }} (Card {{ card_info.card_index }}):</label>
-                            <input type="text" id="label_for_card_{{ card_info.card_index }}" name="label_for_card_{{ card_info.card_index }}" value="{{ card_info.user_label }}" placeholder="Enter custom label">
+            <div class="panel-body">
+                <div class="board-toolbar">
+                    <span class="hint" id="board-hint">Tap a sound to play it on the selected speaker.</span>
+                </div>
+                <div id="categories-container"></div>
+                <div class="category" id="unassigned-category" data-category-name="Unassigned">
+                    <div class="category-header">
+                        <span class="drag-handle">⠿</span>
+                        <h3>Unassigned</h3>
+                        <span class="category-count" data-count></span>
+                        <div class="category-controls">
+                            <button class="btn btn-sm play-all-btn">▶ All</button>
                         </div>
-                    {% endfor %}
                     </div>
-                {% else %}<p>No sound cards detected.</p>{% endif %}
-            </form>
-        </div>
-    </div>
+                    <ul class="tile-grid" id="unassigned-list"></ul>
+                </div>
+            </div>
+        </section>
 
-    <div id="toast-notification"></div>
+        <!-- Tools sidebar -->
+        <aside class="panel">
+            <div class="tabs">
+                <button class="tab active" data-tab="speak">🗣 Speak</button>
+                <button class="tab" data-tab="volume">🔊 Volume</button>
+                <button class="tab" data-tab="upload">⬆ Upload</button>
+                <button class="tab" data-tab="speakers">🔈 Speakers</button>
+            </div>
 
-    <template id="sound-file-template">
-        <li class="sound-file-item">
-            <span class="file-name"></span>
-            <div class="play-buttons"></div>
-            <div class="file-controls">
-                <label title="Number of times to play">Repeat:</label>
-                <input type="number" class="repeat-count" value="1" min="1" max="20">
-                <button class="rename-btn" title="Rename File">✏️</button>
-                <button class="delete-btn" title="Delete File">🗑️</button>
+            <div class="tab-panel active" id="tab-speak">
+                <div class="field">
+                    <label for="tts-text">Text to speak</label>
+                    <textarea id="tts-text" placeholder="Type something to announce…"></textarea>
+                </div>
+                <div class="field">
+                    <label for="tts-lang">Language</label>
+                    <select id="tts-lang">
+                        <option value="en">English</option>
+                        <option value="tl">Filipino / Tagalog</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="ja">Japanese</option>
+                    </select>
+                </div>
+                <p class="hint" style="margin:-4px 0 12px;color:var(--muted);font-size:.8rem">
+                    Plays to <strong id="speak-target-name">the selected speaker</strong>
+                    <span id="speak-bg-note"></span>.
+                </p>
+                <button class="btn btn-primary full" id="speak-btn">🗣 Speak now</button>
+            </div>
+
+            <div class="tab-panel" id="tab-volume">
+                <div id="volume-controls-container"><p class="empty-state">Loading volume controls…</p></div>
+            </div>
+
+            <div class="tab-panel" id="tab-upload">
+                <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
+                    <div class="field">
+                        <label for="file_upload">WAV or MP3 file</label>
+                        <input type="file" id="file_upload" name="file" accept=".wav,.mp3" required>
+                    </div>
+                    <p class="hint" style="color:var(--muted);font-size:.8rem;margin:-4px 0 12px">
+                        MP3s are auto-converted to WAV. Saved to <code>{{ SOUND_FOLDER }}</code>.
+                    </p>
+                    <button type="submit" class="btn btn-green full">⬆ Upload file</button>
+                </form>
+            </div>
+
+            <div class="tab-panel" id="tab-speakers">
+                <form id="speaker-labels-form">
+                    {% if cards_for_labeling %}
+                        {% for card_info in cards_for_labeling %}
+                        <div class="field">
+                            <label for="label_for_card_{{ card_info.card_index }}">{{ card_info.default_name }} (Card {{ card_info.card_index }})</label>
+                            <input type="text" id="label_for_card_{{ card_info.card_index }}" name="label_for_card_{{ card_info.card_index }}" value="{{ card_info.user_label }}" placeholder="Friendly name, e.g. Living Room">
+                        </div>
+                        {% endfor %}
+                        <button type="button" class="btn btn-primary full" id="save-labels-btn">💾 Save speaker names</button>
+                    {% else %}
+                        <p class="empty-state">No sound cards detected.</p>
+                    {% endif %}
+                </form>
+            </div>
+        </aside>
+    </main>
+
+    <div id="toast"></div>
+
+    <template id="tile-template">
+        <li class="tile" data-filename="">
+            <button class="tile-play" title="Play">▶</button>
+            <span class="tile-name"></span>
+            <div class="tile-actions">
+                <button class="icon rename" title="Rename">✏️</button>
+                <button class="icon delete" title="Delete">🗑️</button>
             </div>
         </li>
     </template>
     <template id="category-template">
-         <div class="category">
+        <div class="category">
             <div class="category-header">
-                <h3 contenteditable="true" class="category-title">Category Name</h3>
-                 <div class="category-controls">
-                    <button class="play-all-btn">Play All</button>
-                    <button class="delete-category-btn btn-danger">Delete</button>
-                 </div>
+                <span class="drag-handle">⠿</span>
+                <h3 class="category-title" contenteditable="false">Category</h3>
+                <span class="category-count" data-count></span>
+                <div class="category-controls">
+                    <button class="btn btn-sm play-all-btn">▶ All</button>
+                    <button class="btn btn-sm btn-danger delete-category-btn" style="display:none">Delete</button>
+                </div>
             </div>
-            <ul class="category-list"></ul>
+            <ul class="tile-grid"></ul>
         </div>
     </template>
 
     <script>
-        // --- GLOBAL VARIABLES & DOM ELEMENTS ---
+        // ---------- Data from server ----------
         const allSoundFiles = {{ files | tojson }};
         const allDevices = {{ discovered_devices | tojson }};
         const allCardsForLabeling = {{ cards_for_labeling | tojson }};
         let categoriesData = {};
+        let editMode = false;
+        let sortables = [];
 
-        const categoriesContainer = document.getElementById('categories-container');
-        const unassignedList = document.getElementById('unassigned-list');
-        const addCategoryBtn = document.getElementById('add-category-btn');
-        const saveLayoutBtn = document.getElementById('save-layout-btn');
-        const soundFileTemplate = document.getElementById('sound-file-template');
-        const categoryTemplate = document.getElementById('category-template');
-        const volumeControlsContainer = document.getElementById('volume-controls-container');
-        const toastNotification = document.getElementById('toast-notification');
-        const ttsTextField = document.getElementById('tts-text');
-        const ttsSpeakerSelect = document.getElementById('tts-speaker-select');
-        const ttsBackgroundSelect = document.getElementById('tts-background-select');
-        const speakBtn = document.getElementById('speak-btn');
+        // ---------- Element refs ----------
+        const $ = (id) => document.getElementById(id);
+        const categoriesContainer = $('categories-container');
+        const unassignedList = $('unassigned-list');
+        const tileTemplate = $('tile-template');
+        const categoryTemplate = $('category-template');
+        const toastEl = $('toast');
+        const activeSpeakerSel = $('active-speaker');
+        const activeBgSel = $('active-bg');
+        const repeatInput = $('repeat-count');
+        const searchInput = $('sound-search');
         let toastTimeout;
 
-        // --- FUNCTION DEFINITIONS (ALL IN ONE PLACE) ---
-
+        // ---------- Helpers ----------
         function showToast(message, type = 'success') {
             clearTimeout(toastTimeout);
-            toastNotification.textContent = message;
-            toastNotification.className = `show ${type}`;
-            toastTimeout = setTimeout(() => {
-                toastNotification.className = toastNotification.className.replace('show', '');
-            }, 3000);
+            toastEl.textContent = message;
+            toastEl.className = `show ${type}`;
+            toastTimeout = setTimeout(() => { toastEl.className = ''; }, 3000);
         }
+        const activeSpeaker = () => activeSpeakerSel.value;
+        const activeBg = () => activeBgSel.value;
+        const repeatCount = () => Math.min(20, Math.max(1, parseInt(repeatInput.value) || 1));
 
-        function playSound(buttonElement, deviceId, filename, count = 1) {
-            const originalText = buttonElement.textContent;
-            buttonElement.disabled = true;
-            buttonElement.textContent = 'Playing...';
-            fetch(`/play/${deviceId}/${filename}/${count}`)
-                .then(response => { if (!response.ok) return response.text().then(text => { throw new Error(text || `Status ${response.status}`) }); })
-                .then(() => showToast(`Playing ${filename}...`, 'success'))
-                .catch(error => showToast(`Error playing ${filename}: ${error.message}`, 'error'))
-                .finally(() => { setTimeout(() => { buttonElement.disabled = false; buttonElement.textContent = originalText; }, 500); });
+        // ---------- Playback ----------
+        function playFile(filename, buttonEl) {
+            const device = activeSpeaker();
+            if (!device) { showToast('Pick a speaker in the top bar first.', 'error'); return; }
+            const count = repeatCount();
+            let url = `/play/${device}/${encodeURIComponent(filename)}/${count}`;
+            if (activeBg()) url += `?background=${encodeURIComponent(activeBg())}`;
+            if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = '⏳'; }
+            fetch(url)
+                .then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t || r.status); }); })
+                .then(() => showToast(`Playing ${filename}${count > 1 ? ` ×${count}` : ''}`, 'success'))
+                .catch(e => showToast(`Error: ${e.message}`, 'error'))
+                .finally(() => { if (buttonEl) setTimeout(() => { buttonEl.disabled = false; buttonEl.textContent = '▶'; }, 400); });
         }
-
-        function renameFile(oldNameElement) {
-            const oldName = oldNameElement.textContent;
-            const newName = prompt(`Enter new name for "${oldName}" (must end with .wav):`, oldName);
-            if (newName && newName !== oldName && newName.toLowerCase().endsWith('.wav')) {
-                fetch('/rename_audio_file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ old_filename: oldName, new_filename: newName }) })
-                .then(response => response.json()).then(data => {
-                    if (data.success) {
-                        oldNameElement.textContent = data.new_filename;
-                        const li = oldNameElement.closest('.sound-file-item');
-                        li.dataset.filename = data.new_filename;
-                        updatePlayButtons(li, data.new_filename);
-                        showToast("File renamed!", "success");
-                    } else { showToast(`Rename failed: ${data.message}`, 'error'); }
-                }).catch(error => showToast(`Rename failed: ${error}`, 'error'));
-            } else if (newName) { showToast("Invalid name. Must end with .wav", "error"); }
-        }
-
-        function deleteFile(filename, elementToRemove) {
-            if (confirm(`Are you sure you want to delete "${filename}"?`)) {
-                fetch(`/delete/${filename}`, { method: 'POST' })
-                .then(response => response.json().then(data => ({ ok: response.ok, data })))
-                .then(({ ok, data }) => {
-                    if (ok && data.success) {
-                       elementToRemove.remove();
-                       const index = allSoundFiles.indexOf(filename);
-                       if (index > -1) allSoundFiles.splice(index, 1);
-                       showToast(`Deleted ${filename}`, 'success');
-                    } else { throw new Error(data.message || `Failed to delete`); }
-                }).catch(error => showToast(`Delete failed: ${error.message}`, 'error'));
-            }
-        }
-
-        function createSoundFileElement(filename) {
-            const templateNode = soundFileTemplate.content.cloneNode(true);
-            const li = templateNode.querySelector('.sound-file-item');
-            const nameSpan = li.querySelector('.file-name');
-            const playButtonsDiv = li.querySelector('.play-buttons');
-            const renameBtn = li.querySelector('.rename-btn');
-            const deleteBtn = li.querySelector('.delete-btn');
-            const repeatInput = li.querySelector('.repeat-count');
-
-            li.dataset.filename = filename; nameSpan.textContent = filename;
-            allDevices.forEach(device => {
-                const btn = document.createElement('button'); btn.className = 'play-btn';
-                btn.textContent = `▶ ${device.ha_name}`;
-                btn.onclick = (event) => playSound(event.target, device.hw_id, filename, repeatInput.value);
-                playButtonsDiv.appendChild(btn);
+        function playAll(listEl, catName) {
+            if (!activeSpeaker()) { showToast('Pick a speaker in the top bar first.', 'error'); return; }
+            const files = Array.from(listEl.querySelectorAll('.tile')).map(t => t.dataset.filename);
+            if (!files.length) { showToast('Nothing to play here.', 'error'); return; }
+            files.forEach(f => {
+                let url = `/play/${activeSpeaker()}/${encodeURIComponent(f)}/1`;
+                if (activeBg()) url += `?background=${encodeURIComponent(activeBg())}`;
+                fetch(url).catch(() => {});
             });
-            if (allDevices.length === 0) playButtonsDiv.textContent = "No speakers";
-            renameBtn.onclick = () => renameFile(nameSpan);
-            deleteBtn.onclick = () => deleteFile(filename, li);
-            return li;
+            showToast(`Queued ${files.length} sound(s) from “${catName}”.`, 'success');
         }
 
-        function updatePlayButtons(liElement, newFilename) {
-            const playButtonsDiv = liElement.querySelector('.play-buttons');
-            const repeatInput = liElement.querySelector('.repeat-count');
-            playButtonsDiv.innerHTML = '';
-             allDevices.forEach(device => {
-                const btn = document.createElement('button'); btn.className = 'play-btn';
-                btn.textContent = `▶ ${device.ha_name}`;
-                btn.onclick = (event) => playSound(event.target, device.hw_id, newFilename, repeatInput.value);
-                playButtonsDiv.appendChild(btn);
-            });
+        // ---------- File actions ----------
+        function renameFile(nameEl) {
+            const oldName = nameEl.textContent;
+            const newName = prompt(`Rename "${oldName}" (must end in .wav):`, oldName);
+            if (!newName || newName === oldName) return;
+            if (!newName.toLowerCase().endsWith('.wav')) { showToast('Name must end with .wav', 'error'); return; }
+            fetch('/rename_audio_file', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_filename: oldName, new_filename: newName }) })
+                .then(r => r.json()).then(d => {
+                    if (!d.success) throw new Error(d.message);
+                    const tile = nameEl.closest('.tile');
+                    nameEl.textContent = d.new_filename; tile.dataset.filename = d.new_filename;
+                    const i = allSoundFiles.indexOf(oldName); if (i > -1) allSoundFiles[i] = d.new_filename;
+                    refreshBackgroundOptions();
+                    showToast('File renamed.', 'success');
+                }).catch(e => showToast(`Rename failed: ${e.message}`, 'error'));
+        }
+        function deleteFile(filename, tileEl) {
+            if (!confirm(`Delete "${filename}"? This cannot be undone.`)) return;
+            fetch(`/delete/${encodeURIComponent(filename)}`, { method: 'POST' })
+                .then(r => r.json().then(d => ({ ok: r.ok, d })))
+                .then(({ ok, d }) => {
+                    if (!ok || !d.success) throw new Error(d.message || 'Failed to delete');
+                    tileEl.remove();
+                    const i = allSoundFiles.indexOf(filename); if (i > -1) allSoundFiles.splice(i, 1);
+                    refreshBackgroundOptions(); updateCounts();
+                    showToast(`Deleted ${filename}`, 'success');
+                }).catch(e => showToast(`Delete failed: ${e.message}`, 'error'));
         }
 
-        function createCategoryElement(name, files = []) {
-            const templateNode = categoryTemplate.content.cloneNode(true);
-            const categoryDiv = templateNode.querySelector('.category');
-            const titleH3 = categoryDiv.querySelector('.category-title');
-            const categoryListUl = categoryDiv.querySelector('.category-list');
-            const deleteBtn = categoryDiv.querySelector('.delete-category-btn');
-            const playAllBtn = categoryDiv.querySelector('.play-all-btn');
-
-            titleH3.textContent = name; categoryDiv.dataset.categoryName = name;
-            titleH3.addEventListener('blur', (e) => {
-                const newName = e.target.textContent.trim();
-                if(newName && newName !== categoryDiv.dataset.categoryName) {
-                    const existingNames = Array.from(categoriesContainer.querySelectorAll('.category')).map(c => c.dataset.categoryName);
-                    if (existingNames.includes(newName) || newName === "Unassigned") {
-                        showToast("Category name already exists or is reserved.", "error"); e.target.textContent = categoryDiv.dataset.categoryName;
-                    } else { categoryDiv.dataset.categoryName = newName; }
-                } else if (!newName) { e.target.textContent = categoryDiv.dataset.categoryName; }
+        // ---------- Builders ----------
+        function createTile(filename) {
+            const tile = tileTemplate.content.cloneNode(true).querySelector('.tile');
+            const nameEl = tile.querySelector('.tile-name');
+            const playBtn = tile.querySelector('.tile-play');
+            tile.dataset.filename = filename;
+            nameEl.textContent = filename;
+            playBtn.onclick = (e) => { e.stopPropagation(); playFile(filename, playBtn); };
+            tile.querySelector('.rename').onclick = (e) => { e.stopPropagation(); renameFile(nameEl); };
+            tile.querySelector('.delete').onclick = (e) => { e.stopPropagation(); deleteFile(filename, tile); };
+            // In view mode a click anywhere on the tile plays it.
+            tile.onclick = () => { if (!editMode) playFile(filename, playBtn); };
+            return tile;
+        }
+        function createCategory(name, files = []) {
+            const cat = categoryTemplate.content.cloneNode(true).querySelector('.category');
+            const titleEl = cat.querySelector('.category-title');
+            const listEl = cat.querySelector('.tile-grid');
+            cat.dataset.categoryName = name;
+            titleEl.textContent = name;
+            files.forEach(f => listEl.appendChild(createTile(f)));
+            titleEl.addEventListener('blur', (e) => {
+                const nn = e.target.textContent.trim();
+                const names = [...categoriesContainer.querySelectorAll('.category')].map(c => c.dataset.categoryName);
+                if (!nn) { e.target.textContent = cat.dataset.categoryName; return; }
+                if (nn !== cat.dataset.categoryName && (names.includes(nn) || nn === 'Unassigned')) {
+                    showToast('That category name is taken or reserved.', 'error');
+                    e.target.textContent = cat.dataset.categoryName;
+                } else { cat.dataset.categoryName = nn; }
             });
-            titleH3.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
-            files.forEach(filename => categoryListUl.appendChild(createSoundFileElement(filename)));
-            Sortable.create(categoryListUl, { group: 'sound-files', animation: 150, ghostClass: 'sortable-ghost' });
-            deleteBtn.onclick = () => {
-                if (confirm(`Delete category "${name}"? Files move to Unassigned.`)) {
-                    Array.from(categoryListUl.children).forEach(fileEl => unassignedList.appendChild(fileEl));
-                    categoryDiv.remove();
-                }
+            titleEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+            cat.querySelector('.play-all-btn').onclick = () => playAll(listEl, cat.dataset.categoryName);
+            cat.querySelector('.delete-category-btn').onclick = () => {
+                if (!confirm(`Delete category "${cat.dataset.categoryName}"? Its sounds move to Unassigned.`)) return;
+                Array.from(listEl.children).forEach(t => unassignedList.appendChild(t));
+                cat.remove(); updateCounts();
             };
-            playAllBtn.onclick = () => showToast(`Play All for "${name}" - Not yet implemented.`, 'info');
-            return categoryDiv;
+            return cat;
         }
 
-        function addCategory() {
-            const name = prompt("Enter new category name:");
-            if (name && name.trim()) {
-                const existingNames = Array.from(categoriesContainer.querySelectorAll('.category')).map(c => c.dataset.categoryName);
-                if (existingNames.includes(name.trim()) || name.trim() === "Unassigned") { showToast("Category name already exists or is reserved.", "error"); return; }
-                categoriesContainer.appendChild(createCategoryElement(name.trim()));
-            }
+        function updateCounts() {
+            document.querySelectorAll('.category').forEach(cat => {
+                const n = cat.querySelectorAll('.tile').length;
+                const badge = cat.querySelector('[data-count]');
+                if (badge) badge.textContent = n === 1 ? '1 sound' : `${n} sounds`;
+            });
+            $('library-stats').textContent = `${allSoundFiles.length} sounds · ${allDevices.length} speakers`;
         }
+
+        function populateBoard() {
+            categoriesContainer.innerHTML = ''; unassignedList.innerHTML = '';
+            const assigned = new Set();
+            for (const cat in categoriesData) {
+                if (cat === 'Unassigned') continue;
+                const files = categoriesData[cat].filter(f => allSoundFiles.includes(f));
+                categoriesContainer.appendChild(createCategory(cat, files));
+                files.forEach(f => assigned.add(f));
+            }
+            const leftover = (categoriesData['Unassigned'] || []).concat(allSoundFiles.filter(f => !assigned.has(f)));
+            [...new Set(leftover)].forEach(f => { if (allSoundFiles.includes(f)) unassignedList.appendChild(createTile(f)); });
+            updateCounts();
+        }
+
+        // ---------- Search ----------
+        function applySearch() {
+            const q = searchInput.value.trim().toLowerCase();
+            document.querySelectorAll('.category').forEach(cat => {
+                let visible = 0;
+                cat.querySelectorAll('.tile').forEach(t => {
+                    const match = t.dataset.filename.toLowerCase().includes(q);
+                    t.classList.toggle('hidden', !match);
+                    if (match) visible++;
+                });
+                cat.classList.toggle('empty-hidden', q !== '' && visible === 0);
+            });
+        }
+
+        // ---------- Edit mode / layout ----------
+        function setEditMode(on) {
+            editMode = on;
+            document.body.classList.toggle('edit-mode', on);
+            $('add-category-btn').style.display = on ? '' : 'none';
+            $('save-layout-btn').style.display = on ? '' : 'none';
+            $('edit-toggle').textContent = on ? '✓ Done' : '✎ Edit layout';
+            $('board-hint').textContent = on
+                ? 'Drag sounds between categories, rename or delete them, then Save.'
+                : 'Tap a sound to play it on the selected speaker.';
+            document.querySelectorAll('.category-title').forEach(t => t.setAttribute('contenteditable', on));
+            document.querySelectorAll('.delete-category-btn').forEach(b => b.style.display = on ? '' : 'none');
+            on ? enableSorting() : disableSorting();
+        }
+        function enableSorting() {
+            disableSorting();
+            const lists = [...document.querySelectorAll('.tile-grid')];
+            lists.forEach(l => sortables.push(Sortable.create(l, { group: 'sounds', animation: 150, ghostClass: 'sortable-ghost' })));
+            sortables.push(Sortable.create(categoriesContainer, { group: 'cats', handle: '.drag-handle', animation: 150, ghostClass: 'sortable-ghost' }));
+        }
+        function disableSorting() { sortables.forEach(s => s.destroy()); sortables = []; }
 
         function saveLayout() {
-            const originalText = saveLayoutBtn.textContent;
-            saveLayoutBtn.disabled = true; saveLayoutBtn.textContent = 'Saving...';
+            const btn = $('save-layout-btn');
+            btn.disabled = true; btn.textContent = '💾 Saving…';
             const layout = {};
-            categoriesContainer.querySelectorAll('.category').forEach(catDiv => {
-                const catName = catDiv.querySelector('.category-title').textContent.trim();
-                catDiv.dataset.categoryName = catName;
-                layout[catName] = Array.from(catDiv.querySelectorAll('.sound-file-item')).map(li => li.dataset.filename);
+            categoriesContainer.querySelectorAll('.category').forEach(cat => {
+                const name = cat.querySelector('.category-title').textContent.trim();
+                cat.dataset.categoryName = name;
+                layout[name] = [...cat.querySelectorAll('.tile')].map(t => t.dataset.filename);
             });
-            layout['Unassigned'] = Array.from(unassignedList.querySelectorAll('.sound-file-item')).map(li => li.dataset.filename);
-            const labelsForm = document.getElementById('speaker-labels-form');
-            const formData = new FormData(labelsForm);
+            layout['Unassigned'] = [...unassignedList.querySelectorAll('.tile')].map(t => t.dataset.filename);
             fetch('/api/save_layout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(layout) })
-            .then(response => { if (!response.ok) throw new Error('Failed to save layout.'); return response.json(); })
-            .then(data => { if (!data.success) throw new Error(data.message || 'Layout save failed.'); return fetch('/update_label', { method: 'POST', body: new URLSearchParams(formData) }); })
-            .then(response => { if (!response.ok) throw new Error('Failed to save labels.'); return response.json(); })
-            .then(data => { if (!data.success) throw new Error(data.message || 'Label save failed.'); showToast("Layout and Labels saved successfully!", "success"); })
-            .catch(error => { console.error('Save failed:', error); showToast(`Save failed: ${error.message}`, 'error'); })
-            .finally(() => { saveLayoutBtn.disabled = false; saveLayoutBtn.textContent = "Save Layout & Labels"; });
+                .then(r => { if (!r.ok) throw new Error('layout save failed'); return r.json(); })
+                .then(d => { if (!d.success) throw new Error(d.message); showToast('Layout saved.', 'success'); updateCounts(); })
+                .catch(e => showToast(`Save failed: ${e.message}`, 'error'))
+                .finally(() => { btn.disabled = false; btn.textContent = '💾 Save'; });
         }
-        
-        function populateUI() {
-             const assignedFiles = new Set();
-             categoriesContainer.innerHTML = ''; unassignedList.innerHTML = '';
-             for (const catName in categoriesData) {
-                 if (catName !== 'Unassigned') {
-                     const filesInCategory = categoriesData[catName].filter(f => allSoundFiles.includes(f));
-                     categoriesContainer.appendChild(createCategoryElement(catName, filesInCategory));
-                     filesInCategory.forEach(f => assignedFiles.add(f));
-                 }
-             }
-             const unassigned = (categoriesData['Unassigned'] || []).concat(allSoundFiles.filter(f => !assignedFiles.has(f)));
-             new Set(unassigned).forEach(filename => {
-                 if(allSoundFiles.includes(filename)) { unassignedList.appendChild(createSoundFileElement(filename)); }
-             });
-             Sortable.create(categoriesContainer, { group: 'categories', animation: 150, handle: '.category-header', ghostClass: 'sortable-ghost' });
-             Sortable.create(unassignedList, { group: 'sound-files', animation: 150, ghostClass: 'sortable-ghost' });
+        function addCategory() {
+            const name = (prompt('New category name:') || '').trim();
+            if (!name) return;
+            const names = [...categoriesContainer.querySelectorAll('.category')].map(c => c.dataset.categoryName);
+            if (names.includes(name) || name === 'Unassigned') { showToast('Name taken or reserved.', 'error'); return; }
+            const cat = createCategory(name);
+            cat.querySelector('.category-title').setAttribute('contenteditable', 'true');
+            cat.querySelector('.delete-category-btn').style.display = '';
+            categoriesContainer.appendChild(cat);
+            enableSorting(); updateCounts();
         }
 
-        function loadLayoutAndFiles() {
-            fetch('/api/get_layout')
-                .then(response => response.json())
-                .then(data => { categoriesData = data || {}; populateUI(); })
-                .catch(error => { console.error("Could not load layout:", error); categoriesData = {}; populateUI(); });
+        // ---------- Speaker labels ----------
+        function saveLabels() {
+            const btn = $('save-labels-btn');
+            btn.disabled = true; btn.textContent = 'Saving…';
+            fetch('/update_label', { method: 'POST', body: new URLSearchParams(new FormData($('speaker-labels-form'))) })
+                .then(r => r.json()).then(d => {
+                    if (!d.success) throw new Error(d.message);
+                    showToast('Speaker names saved. Reload to see them everywhere.', 'success');
+                }).catch(e => showToast(`Save failed: ${e.message}`, 'error'))
+                .finally(() => { btn.disabled = false; btn.textContent = '💾 Save speaker names'; });
         }
 
+        // ---------- Top-bar selects ----------
+        function populateSpeakerSelects() {
+            activeSpeakerSel.innerHTML = '';
+            if (!allDevices.length) { activeSpeakerSel.innerHTML = '<option value="">No speakers found</option>'; return; }
+            allDevices.forEach((d, i) => {
+                const o = document.createElement('option');
+                o.value = d.hw_id; o.textContent = d.ha_name;
+                activeSpeakerSel.appendChild(o);
+            });
+            updateSpeakTarget();
+        }
+        function refreshBackgroundOptions() {
+            const keep = activeBgSel.value;
+            activeBgSel.innerHTML = '<option value="">— None —</option>';
+            [...allSoundFiles].sort().forEach(f => {
+                const o = document.createElement('option'); o.value = f; o.textContent = f; activeBgSel.appendChild(o);
+            });
+            if ([...activeBgSel.options].some(o => o.value === keep)) activeBgSel.value = keep;
+            updateSpeakTarget();
+        }
+        function updateSpeakTarget() {
+            const sp = activeSpeakerSel.options[activeSpeakerSel.selectedIndex];
+            $('speak-target-name').textContent = (sp && sp.value) ? sp.textContent : 'the selected speaker';
+            $('speak-bg-note').textContent = activeBg() ? ` over “${activeBg()}”` : '';
+        }
+
+        // ---------- TTS ----------
+        function speak() {
+            const text = $('tts-text').value.trim();
+            const speaker = activeSpeaker();
+            if (!text) { showToast('Type something to speak.', 'error'); return; }
+            if (!speaker) { showToast('Pick a speaker in the top bar first.', 'error'); return; }
+            const btn = $('speak-btn');
+            btn.disabled = true; btn.textContent = '🗣 Speaking…';
+            const payload = { text, speaker_id: speaker, lang: $('tts-lang').value };
+            if (activeBg()) payload.background_sound = activeBg();
+            fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+                .then(r => r.json().then(d => ({ ok: r.ok, d })))
+                .then(({ ok, d }) => { if (!ok || !d.success) throw new Error(d.message); showToast('Queued speech for playback.', 'success'); })
+                .catch(e => showToast(`TTS error: ${e.message}`, 'error'))
+                .finally(() => { btn.disabled = false; btn.textContent = '🗣 Speak now'; });
+        }
+
+        // ---------- Volume ----------
         async function loadVolumeControls() {
-            volumeControlsContainer.innerHTML = '';
-            if (!allCardsForLabeling || allCardsForLabeling.length === 0) {
-                volumeControlsContainer.innerHTML = '<p>No sound cards available.</p>'; return;
-            }
+            const wrap = $('volume-controls-container'); wrap.innerHTML = '';
+            if (!allCardsForLabeling.length) { wrap.innerHTML = '<p class="empty-state">No sound cards available.</p>'; return; }
             for (const card of allCardsForLabeling) {
-                const cardDiv = document.createElement('div'); cardDiv.className = 'card-volume-controls';
-                cardDiv.innerHTML = `<h4>${card.user_label || card.default_name} (Card ${card.card_index})</h4>`;
+                const div = document.createElement('div'); div.className = 'vol-card';
+                div.innerHTML = `<h4>${card.user_label || card.default_name} <span class="category-count">(Card ${card.card_index})</span></h4>`;
                 try {
-                    const response = await fetch(`/api/card/${card.card_index}/mixer_controls`);
-                    if (!response.ok) throw new Error(`Failed to fetch controls`);
-                    const controls = await response.json();
-                    if (controls.error) { cardDiv.innerHTML += `<p class="error">${controls.error}</p>`; }
-                    else if (controls.length === 0) { cardDiv.innerHTML += '<p>No simple mixer controls found.</p>'; }
-                    else {
-                        for (const controlName of controls) {
-                            const controlDiv = document.createElement('div'); controlDiv.className = 'mixer-control';
-                            const label = document.createElement('label'); label.textContent = controlName + ':';
-                            const slider = document.createElement('input'); slider.type = 'range'; slider.min = '0'; slider.max = '100';
-                            slider.dataset.cardId = card.card_index; slider.dataset.controlName = controlName;
-                            const volumeDisplay = document.createElement('span'); volumeDisplay.className = 'volume-display'; volumeDisplay.textContent = '...%';
-                            try {
-                                const volResponse = await fetch(`/api/card/${card.card_index}/control/${encodeURIComponent(controlName)}/current_volume`);
-                                if (volResponse.ok) {
-                                    const volData = await volResponse.json();
-                                    if (volData.volume !== null && volData.volume !== undefined) {
-                                        slider.value = volData.volume; volumeDisplay.textContent = `${volData.volume}%`;
-                                    } else { volumeDisplay.textContent = 'N/A'; slider.disabled = true; }
-                                } else { volumeDisplay.textContent = 'Err'; slider.disabled = true; }
-                            } catch (e) { volumeDisplay.textContent = 'Err'; slider.disabled = true; }
-                            slider.addEventListener('input', function() { volumeDisplay.textContent = `${this.value}%`; });
-                            slider.addEventListener('change', async function() {
-                                try {
-                                    const setResponse = await fetch(`/api/set_volume/${this.dataset.cardId}/${encodeURIComponent(this.dataset.controlName)}/${this.value}`, { method: 'POST' });
-                                    if (!setResponse.ok) { const errData = await setResponse.json(); throw new Error(errData.message || `Failed to set volume`); }
-                                } catch (e) { showToast(`Error setting volume: ${e.message}`, 'error'); }
-                            });
-                            controlDiv.appendChild(label); controlDiv.appendChild(slider); controlDiv.appendChild(volumeDisplay); cardDiv.appendChild(controlDiv);
-                        }
+                    const controls = await (await fetch(`/api/card/${card.card_index}/mixer_controls`)).json();
+                    if (controls.error) div.innerHTML += `<p class="empty-state">${controls.error}</p>`;
+                    else if (!controls.length) div.innerHTML += '<p class="empty-state">No mixer controls.</p>';
+                    else for (const ctl of controls) {
+                        const row = document.createElement('div'); row.className = 'mixer';
+                        const label = document.createElement('label'); label.textContent = ctl;
+                        const slider = document.createElement('input'); slider.type = 'range'; slider.min = 0; slider.max = 100;
+                        const val = document.createElement('span'); val.className = 'val'; val.textContent = '…';
+                        try {
+                            const vd = await (await fetch(`/api/card/${card.card_index}/control/${encodeURIComponent(ctl)}/current_volume`)).json();
+                            if (vd.volume != null) { slider.value = vd.volume; val.textContent = `${vd.volume}%`; }
+                            else { val.textContent = 'N/A'; slider.disabled = true; }
+                        } catch { val.textContent = 'err'; slider.disabled = true; }
+                        slider.oninput = () => val.textContent = `${slider.value}%`;
+                        slider.onchange = () => fetch(`/api/set_volume/${card.card_index}/${encodeURIComponent(ctl)}/${slider.value}`, { method: 'POST' })
+                            .then(r => { if (!r.ok) throw new Error(); })
+                            .catch(() => showToast(`Failed to set ${ctl} volume.`, 'error'));
+                        row.append(label, slider, val); div.appendChild(row);
                     }
-                } catch (error) { cardDiv.innerHTML += `<p class="error">Could not load controls: ${error.message}</p>`; }
-                volumeControlsContainer.appendChild(cardDiv);
+                } catch (e) { div.innerHTML += `<p class="empty-state">Could not load controls.</p>`; }
+                wrap.appendChild(div);
             }
         }
 
-        async function handleSpeakRequest() {
-            const text = ttsTextField.value.trim();
-            const speakerId = ttsSpeakerSelect.value;
-            const backgroundSound = ttsBackgroundSelect.value;
-            const originalText = speakBtn.textContent;
-            if (!text || !speakerId) { showToast("Please enter text and select a speaker.", "error"); return; }
-            speakBtn.disabled = true; speakBtn.textContent = 'Speaking...';
-            const payload = { text: text, speaker_id: speakerId };
-            if (backgroundSound) { payload.background_sound = backgroundSound; }
-            try {
-                const response = await fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const data = await response.json();
-                if (!response.ok || !data.success) { throw new Error(data.message || 'Failed to generate speech.'); }
-                showToast("Queued speech for playback!", "success");
-            } catch (error) { console.error('TTS Request failed:', error); showToast(`TTS Error: ${error.message}`, 'error'); }
-            finally { speakBtn.disabled = false; speakBtn.textContent = originalText; }
-        }
-        
-        function populateTtsOptions() {
-            ttsSpeakerSelect.innerHTML = ''; ttsBackgroundSelect.innerHTML = '<option value="">-- None --</option>';
-            if (!allDevices || allDevices.length === 0) {
-                ttsSpeakerSelect.innerHTML = '<option value="">--No Speakers Found--</option>';
-            } else {
-                allDevices.forEach(device => {
-                    const option = document.createElement('option');
-                    option.value = device.hw_id; option.textContent = device.ha_name;
-                    ttsSpeakerSelect.appendChild(option);
-                });
-            }
-            if (allSoundFiles && allSoundFiles.length > 0) {
-                allSoundFiles.forEach(filename => {
-                    const option = document.createElement('option');
-                    option.value = filename; option.textContent = filename;
-                    ttsBackgroundSelect.appendChild(option);
-                });
-            }
-        }
-        
-        // --- EVENT LISTENERS & INITIAL PAGE LOAD ---
+        // ---------- Init ----------
         document.addEventListener('DOMContentLoaded', () => {
-            addCategoryBtn.addEventListener('click', addCategory);
-            saveLayoutBtn.addEventListener('click', saveLayout);
-            speakBtn.addEventListener('click', handleSpeakRequest);
-            
-            loadLayoutAndFiles();
+            // theme
+            const saved = localStorage.getItem('ss-theme');
+            if (saved) document.documentElement.setAttribute('data-theme', saved);
+            $('theme-toggle').onclick = () => {
+                const cur = document.documentElement.getAttribute('data-theme');
+                const isDark = cur === 'dark' || (cur === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+                const next = isDark ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                localStorage.setItem('ss-theme', next);
+            };
+            // tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.onclick = () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active'); $(`tab-${tab.dataset.tab}`).classList.add('active');
+            });
+            // wiring
+            $('edit-toggle').onclick = () => setEditMode(!editMode);
+            $('add-category-btn').onclick = addCategory;
+            $('save-layout-btn').onclick = saveLayout;
+            $('speak-btn').onclick = speak;
+            const lblBtn = $('save-labels-btn'); if (lblBtn) lblBtn.onclick = saveLabels;
+            searchInput.oninput = applySearch;
+            activeSpeakerSel.onchange = updateSpeakTarget;
+            activeBgSel.onchange = updateSpeakTarget;
+            document.querySelector('#unassigned-category .play-all-btn').onclick = () => playAll(unassignedList, 'Unassigned');
+
+            // data
+            populateSpeakerSelects();
+            refreshBackgroundOptions();
             loadVolumeControls();
-            populateTtsOptions();
+            fetch('/api/get_layout').then(r => r.json())
+                .then(d => { categoriesData = d || {}; })
+                .catch(() => { categoriesData = {}; })
+                .finally(() => { populateBoard(); });
         });
     </script>
-
 </body>
 </html>

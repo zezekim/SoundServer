@@ -54,16 +54,38 @@ directly (or the Sound Server under gunicorn via `flask-env/gunicorn_config.py`)
   leading `/`, and enforce the sound folder as a prefix; `secure_filename` is
   used on uploads/renames. **Keep these checks** on any new file-handling route.
 - `device_id` flows into `aplay -D hw:<device_id>` — `app.py` rejects `..` in it.
-- Secrets (`secret_key`, `DEFAULT_API_KEY`, `key.pem`/`cert.pem`, `api_keys.*`)
-  are **git-ignored** and should never be re-committed. Don't hard-code new
-  secrets; read them from env or an un-tracked file. Treat any previously
-  committed value as compromised.
+- Secrets load from a git-ignored **`.env`** at the repo root via
+  `python-dotenv` (`load_dotenv()` is called near the top of each app; keys are
+  read with `os.environ.get(...)` and safe defaults). Add new config the same
+  way — put the key in `.env.example` with a placeholder, read it with a default,
+  and **never hard-code a secret**. `key.pem`/`cert.pem` and `api_keys.*` are
+  also git-ignored. Treat any previously committed value as compromised.
 
-## Hard-coded paths (adjust per host, don't assume portability)
+## Host-specific config
 
-- `flask-env/app.py`: `SOUND_FOLDER`, `TTS_CACHE_FOLDER` → `/home/rs/flask-env/...`
-- `uptime/monitor_connection.py`: `TARGET_IP`, WAV paths, `AUDIO_DEVICE = hw:2,0`
-- `call.py` / `sms.py`: `SERIAL_PORT = /dev/ttyS0`, `BAUD_RATE = 115200`
+Most host-specific values are now **`.env`-overridable** with the old hard-coded
+values as defaults:
+
+- `flask-env/app.py`: `SOUND_FOLDER`, `TTS_CACHE_FOLDER`, `SOUND_SERVER_PORT`.
+- `call.py` / `sms.py`: `*_SERIAL_PORT` (`/dev/ttyS0`), `*_BAUD_RATE`, `*_WEB_PORT`,
+  `SMS_PIN_CODE`, `SMS_PHONE_NUMBER`.
+
+Still hard-coded (adjust in source if porting): `uptime/monitor_connection.py`
+(`TARGET_IP`, WAV paths, `AUDIO_DEVICE = hw:2,0`) and the absolute tool paths
+(`/usr/bin/aplay`, etc.) in every service.
+
+## Dashboard (`flask-env/templates/index.html`)
+
+Single-file template + vanilla JS (SortableJS from CDN). It consumes the Jinja
+vars `files`, `discovered_devices` (`hw_id`/`ha_name`/`card_index`),
+`cards_for_labeling`, and `SOUND_FOLDER`, and drives the JSON/`/play` API
+verbatim — **preserve those endpoint shapes when editing routes.** UX model: a
+global *active speaker* + *repeat* + *background* chosen in the sticky header;
+tapping a sound plays it there. A separate **Edit-layout mode** toggles SortableJS
+drag/drop and category rename/delete; "Save" posts to `/api/save_layout`.
+Tabbed sidebar = Speak (`/api/speak`), Volume (`/api/card/.../mixer_controls`,
+`.../current_volume`, `/api/set_volume`), Upload (`/upload`), Speakers
+(`/update_label`). Theme is light/dark via `data-theme` on `<html>`.
 
 ## Running / verifying
 
