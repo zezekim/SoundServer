@@ -20,10 +20,16 @@ There is **no build step and no test suite.** These are plain Python scripts run
 directly (or the Sound Server under gunicorn via `flask-env/gunicorn_config.py`).
 
 On the Pi they run as **systemd services** (`soundserver.service`,
-`sms_gateway.service`, `uptime_monitor.service`). `deploy/install.sh` uninstalls
-the old units and installs fresh ones for the current checkout — if you change a
+`sms_gateway.service`, `call_intercom.service`, `uptime_monitor.service`),
+fronted by a **Caddy portal** on HTTP :80 (`deploy/caddy/site/index.html`, a
+static page linking to each dashboard). `deploy/install.sh` uninstalls the old
+units and installs fresh ones for the current checkout — if you change a
 service's entry point, ports, or venv layout, update the matching unit heredoc in
-that script. `call.py` has no unit (run manually).
+that script; if you add a service with a dashboard, add it to the portal's
+`SERVICES` array and `install_caddy`'s `config.js` ports. The portal links to the
+apps directly (not reverse-proxied) because they use absolute paths and the Sound
+Server serves its own HTTPS. `sms_gateway` and `call_intercom` share `/dev/ttyS0`
+and can't run simultaneously.
 
 ## Architecture patterns to preserve
 

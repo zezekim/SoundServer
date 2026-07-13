@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SoundServer · Home</title>
+    <style>
+        :root {
+            --bg: #f4f6fb; --surface: #ffffff; --surface-2: #f0f2f7; --border: #e2e6ef;
+            --text: #1c2333; --muted: #6b7385; --brand: #4f6bed; --brand-ink: #ffffff;
+            --green: #22a06b; --amber: #d9880f; --red: #d64545;
+            --shadow: 0 1px 3px rgba(20,30,60,.08), 0 8px 24px rgba(20,30,60,.07); --radius: 16px;
+        }
+        :root[data-theme="dark"] {
+            --bg: #0f1420; --surface: #171d2b; --surface-2: #1f2637; --border: #2a3348;
+            --text: #e7ebf3; --muted: #9aa3b8; --brand: #6a83f5; --brand-ink: #0f1420;
+            --green: #34c184; --amber: #e6a23c; --red: #f06868;
+            --shadow: 0 1px 3px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.4);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root[data-theme="auto"] {
+                --bg: #0f1420; --surface: #171d2b; --surface-2: #1f2637; --border: #2a3348;
+                --text: #e7ebf3; --muted: #9aa3b8; --brand: #6a83f5; --brand-ink: #0f1420;
+                --green: #34c184; --amber: #e6a23c; --red: #f06868;
+                --shadow: 0 1px 3px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.4);
+            }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .wrap { max-width: 1000px; margin: 0 auto; padding: 40px 20px 60px; }
+        header { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+        .logo { font-size: 2rem; }
+        h1 { margin: 0; font-size: 1.6rem; letter-spacing: -.01em; }
+        .sub { color: var(--muted); margin: 0 0 30px; font-size: .95rem; }
+        #theme-toggle { margin-left: auto; background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; width: 42px; height: 42px; cursor: pointer; font-size: 1.1rem; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+        .card { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; text-decoration: none;
+            color: inherit; transition: transform .12s ease, border-color .12s ease; }
+        .card:hover { transform: translateY(-3px); border-color: var(--brand); }
+        .card-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .card-icon { font-size: 1.8rem; width: 52px; height: 52px; display: grid; place-items: center;
+            background: var(--surface-2); border-radius: 13px; }
+        .card h2 { margin: 0; font-size: 1.15rem; }
+        .card .port { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+        .card p { margin: 0 0 18px; color: var(--muted); font-size: .9rem; line-height: 1.5; flex-grow: 1; }
+        .card-foot { display: flex; align-items: center; gap: 10px; }
+        .status { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; color: var(--muted); }
+        .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+        .status.online .dot { background: var(--green); box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 22%, transparent); }
+        .status.online { color: var(--green); }
+        .status.down .dot { background: var(--red); }
+        .status.down { color: var(--red); }
+        .open { margin-left: auto; background: var(--brand); color: var(--brand-ink); border-radius: 9px;
+            padding: 8px 16px; font-weight: 600; font-size: .88rem; }
+        .badge { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+            padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
+
+        .note { margin-top: 26px; padding: 14px 18px; background: var(--surface-2); border: 1px solid var(--border);
+            border-radius: 12px; color: var(--muted); font-size: .85rem; line-height: 1.55; }
+        .bg-svc { margin-top: 22px; color: var(--muted); font-size: .85rem; }
+        .bg-svc code { background: var(--surface-2); padding: 2px 6px; border-radius: 5px; }
+        footer { margin-top: 34px; color: var(--muted); font-size: .8rem; text-align: center; }
+    </style>
+    <!-- Optional: install.sh writes /config.js with the live ports. Falls back to defaults if absent. -->
+    <script src="config.js" onerror="void 0"></script>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <span class="logo">🔊</span>
+            <div>
+                <h1>SoundServer</h1>
+            </div>
+            <button id="theme-toggle" title="Toggle light / dark">🌓</button>
+        </header>
+        <p class="sub">Home automation audio, intercom &amp; alerting hub · pick a dashboard below.</p>
+
+        <div class="grid" id="cards"></div>
+
+        <p class="bg-svc" id="bg-svc"></p>
+
+        <div class="note" id="https-note" style="display:none">
+            ⚠️ The Sound Server uses a self-signed HTTPS certificate. Your browser will warn on
+            first visit (accept it to continue), and its status dot below may show
+            <strong>unreachable</strong> until you've accepted the certificate once.
+        </div>
+
+        <footer>Served by Caddy on port 80 · SoundServer</footer>
+    </div>
+
+    <script>
+        // Ports (overridable via config.js -> window.SS_PORTS).
+        const P = Object.assign({ sound: 5000, sms: 5010, call: 5020 }, window.SS_PORTS || {});
+        const host = location.hostname || 'localhost';
+
+        const SERVICES = [
+            { key: 'sound', icon: '🔊', name: 'Sound Server',  scheme: 'https', port: P.sound,
+              desc: 'Play sound clips and text-to-speech to any speaker, mix backgrounds, manage the sound library and volumes.' },
+            { key: 'sms',   icon: '✉️', name: 'SMS Gateway',   scheme: 'http',  port: P.sms,
+              desc: 'Send and receive SMS through the SIM800L, with a live inbox feed and signal-strength readout.' },
+            { key: 'call',  icon: '📞', name: 'Call Intercom', scheme: 'http',  port: P.call,
+              desc: 'Configure the GSM auto-answer intercom — chime, answer delay, and which speakers broadcast the call.' },
+        ];
+        const BACKGROUND = [
+            { name: 'Uptime Monitor', desc: 'pings the network and plays a chime when the link goes up or down (no dashboard).' },
+        ];
+
+        const cardsEl = document.getElementById('cards');
+        let hasHttps = false;
+
+        SERVICES.forEach(svc => {
+            const url = `${svc.scheme}://${host}:${svc.port}`;
+            if (svc.scheme === 'https') hasHttps = true;
+            const a = document.createElement('a');
+            a.className = 'card'; a.href = url;
+            a.innerHTML = `
+                <div class="card-top">
+                    <div class="card-icon">${svc.icon}</div>
+                    <div>
+                        <h2>${svc.name}</h2>
+                        <span class="port">${svc.scheme}://${host}:${svc.port}</span>
+                    </div>
+                </div>
+                <p>${svc.desc}</p>
+                <div class="card-foot">
+                    <span class="status" data-key="${svc.key}"><span class="dot"></span><span class="txt">checking…</span></span>
+                    ${svc.scheme === 'https' ? '<span class="badge">HTTPS</span>' : ''}
+                    <span class="open">Open →</span>
+                </div>`;
+            cardsEl.appendChild(a);
+            probe(svc, url);
+        });
+
+        document.getElementById('bg-svc').innerHTML =
+            'Also running in the background: ' +
+            BACKGROUND.map(b => `<strong>${b.name}</strong> — ${b.desc}`).join(' ');
+
+        if (hasHttps) document.getElementById('https-note').style.display = '';
+
+        function setStatus(key, state, text) {
+            const el = document.querySelector(`.status[data-key="${key}"]`);
+            if (!el) return;
+            el.className = `status ${state}`;
+            el.querySelector('.txt').textContent = text;
+        }
+
+        async function probe(svc, url) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 3500);
+            try {
+                await fetch(url, { mode: 'no-cors', signal: ctrl.signal, cache: 'no-store' });
+                clearTimeout(timer);
+                setStatus(svc.key, 'online', 'online');
+            } catch (e) {
+                clearTimeout(timer);
+                setStatus(svc.key, 'down', svc.scheme === 'https' ? 'accept cert' : 'unreachable');
+            }
+        }
+
+        // Theme toggle
+        const saved = localStorage.getItem('ss-theme');
+        if (saved) document.documentElement.setAttribute('data-theme', saved);
+        document.getElementById('theme-toggle').onclick = () => {
+            const cur = document.documentElement.getAttribute('data-theme');
+            const isDark = cur === 'dark' || (cur === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+            const next = isDark ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('ss-theme', next);
+        };
+    </script>
+</body>
+</html>

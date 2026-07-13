@@ -143,15 +143,16 @@ needed to run `app.py`).
 
 ### 3. Install as systemd services (Raspberry Pi)
 
-On the Pi, the services run under **systemd**. `deploy/install.sh` reconstructs
-that setup — it **uninstalls the old unit(s)** then installs fresh ones for the
-current checkout (creating virtualenvs, generating a `.env` with fresh secrets if
-none exists, and a self-signed TLS cert for the Sound Server's HTTPS):
+On the Pi, the services run under **systemd**, fronted by a **Caddy portal on
+port 80**. `deploy/install.sh` reconstructs the whole setup — it **uninstalls the
+old unit(s)** then installs fresh ones for the current checkout (creating
+virtualenvs, generating a `.env` with fresh secrets if none exists, a self-signed
+TLS cert for the Sound Server's HTTPS, and the Caddy landing page):
 
 ```bash
 sudo ./deploy/install.sh                 # (re)install soundserver.service only
-sudo ./deploy/install.sh all             # soundserver + sms_gateway + uptime_monitor
-sudo ./deploy/install.sh soundserver sms # pick specific components
+sudo ./deploy/install.sh all             # every service + the Caddy portal
+sudo ./deploy/install.sh call caddy      # pick specific components
 sudo ./deploy/install.sh --uninstall all # only remove the services
 ```
 
@@ -163,13 +164,23 @@ systemctl status soundserver.service
 journalctl -u soundserver.service -f
 ```
 
-| Service | Unit | Runs |
-|---------|------|------|
+| Component | Unit | Runs |
+|-----------|------|------|
+| **Portal** | `caddy` | Landing page on **HTTP :80** linking to the dashboards below |
 | Sound Server | `soundserver.service` | `flask-env/app.py` via gunicorn, HTTPS on :5000 |
 | SMS Gateway | `sms_gateway.service` | `sms/sms.py` on :5010 |
-| Uptime Monitor | `uptime_monitor.service` | `uptime/monitor_connection.py` |
+| Call Intercom | `call_intercom.service` | `call/call.py` on :5020 |
+| Uptime Monitor | `uptime_monitor.service` | `uptime/monitor_connection.py` (no dashboard) |
 
-(`call/call.py` has no unit — on the original Pi it was always run manually.)
+**The portal** (`deploy/caddy/`) is a static page served by Caddy at
+`http://<pi>/`. It auto-discovers the Pi's hostname and links to each service's
+own dashboard on its own port (with a best-effort online/offline indicator) — the
+Flask apps are linked directly rather than reverse-proxied, since they use
+absolute paths and the Sound Server terminates its own HTTPS.
+
+> **Note:** `sms_gateway` and `call_intercom` share the single SIM800L on
+> `/dev/ttyS0` and cannot both run at once — `install.sh` warns about this and
+> enables both, but stop one before starting the other.
 
 ### Preparing sounds
 
@@ -228,7 +239,8 @@ soundserver/
 │   └── monitor_connection.py
 ├── sound/                # master .mp3 prompt library
 ├── deploy/
-│   └── install.sh        # (un)install systemd services
+│   ├── install.sh        # (un)install systemd services + Caddy portal
+│   └── caddy/            # portal landing page + reference Caddyfile
 ├── mp3_to_padded_wav.sh  # mp3 -> padded wav converter
 ├── .env.example          # config template (copy to .env)
 └── requirements.txt

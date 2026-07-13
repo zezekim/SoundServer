@@ -7,17 +7,18 @@
 # .env, generating a self-signed TLS cert for the Sound Server, and wiring the
 # gunicorn-based service exactly as documented in history.txt.
 #
-# Reconstructed from history.txt. The services that were installed as systemd
-# units on the original Raspberry Pi:
-#     soundserver.service    -> flask-env/app.py via gunicorn (HTTPS :5000)
-#     sms_gateway.service     -> sms/sms.py           (:5010)
+# Components:
+#     soundserver.service     -> flask-env/app.py via gunicorn (HTTPS :5000)
+#     sms_gateway.service     -> sms/sms.py            (:5010)
+#     call_intercom.service   -> call/call.py          (:5020)
 #     uptime_monitor.service  -> uptime/monitor_connection.py
-# (call/call.py was always run manually, so it has no service.)
+#     caddy (portal)          -> Caddy landing page on HTTP :80 linking to the
+#                                dashboards above (soundserver, sms, call)
 #
 # Usage:
 #     sudo ./deploy/install.sh                 # (re)install soundserver only
-#     sudo ./deploy/install.sh all             # soundserver + sms + uptime
-#     sudo ./deploy/install.sh soundserver sms # pick specific components
+#     sudo ./deploy/install.sh all             # every service + the Caddy portal
+#     sudo ./deploy/install.sh call caddy      # pick specific components
 #     sudo ./deploy/install.sh --uninstall all # only remove, don't reinstall
 #
 # Env overrides:
@@ -31,8 +32,11 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FLASK_DIR="$REPO_DIR/flask-env"
 SMS_DIR="$REPO_DIR/sms"
+CALL_DIR="$REPO_DIR/call"
 UPTIME_DIR="$REPO_DIR/uptime"
 SYSTEMD_DIR="${SYSTEMD_DIR:-/etc/systemd/system}"
+PORTAL_ROOT="${PORTAL_ROOT:-/var/www/soundserver}"
+CADDYFILE="${CADDYFILE:-/etc/caddy/Caddyfile}"
 
 # The user the services run as: explicit env > the human behind sudo > repo owner > rs.
 SERVICE_USER="${SERVICE_USER:-${SUDO_USER:-$(stat -c '%U' "$REPO_DIR" 2>/dev/null || echo rs)}}"
@@ -47,7 +51,8 @@ UNINSTALL_ONLY=0
 COMPONENTS=()
 
 usage() {
-    sed -n '3,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    # Print the header comment block (from line 3 to the first non-comment line).
+    awk 'NR<3{next} /^[^#]/{exit} {sub(/^# ?/,""); print}' "${BASH_SOURCE[0]}"
     exit "${1:-0}"
 }
 
@@ -58,11 +63,12 @@ for arg in "$@"; do
     case "$arg" in
         -h|--help)       usage 0 ;;
         --uninstall)     UNINSTALL_ONLY=1 ;;
-        all)             COMPONENTS=(soundserver sms uptime) ;;
+        all)             COMPONENTS=(soundserver sms call uptime caddy) ;;
         soundserver|sound) COMPONENTS+=(soundserver) ;;
         sms)             COMPONENTS+=(sms) ;;
+        call)            COMPONENTS+=(call) ;;
         uptime)          COMPONENTS+=(uptime) ;;
-        call)            warn "call.py has no systemd service (it was run manually) — skipping." ;;
+        caddy|portal)    COMPONENTS+=(caddy) ;;
         *)               die "Unknown argument: '$arg' (try --help)" ;;
     esac
 done
@@ -80,15 +86,32 @@ log "Repo:          $REPO_DIR"
 log "Service user:  $SERVICE_USER"
 log "Components:    ${COMPONENTS[*]}"
 log "Mode:          $([ $UNINSTALL_ONLY -eq 1 ] && echo 'uninstall only' || echo 'uninstall old + install new')"
+
+# The SMS gateway and Call intercom share the single SIM800L on /dev/ttyS0 and
+# cannot both be active at once.
+if [ "$UNINSTALL_ONLY" -eq 0 ] && printf '%s\n' "${COMPONENTS[@]}" | grep -qx sms \
+   && printf '%s\n' "${COMPONENTS[@]}" | grep -qx call; then
+    warn "sms_gateway and call_intercom both use /dev/ttyS0 — only one can run at a time."
+    warn "Both will be enabled; stop one before starting the other (systemctl stop <svc>)."
+fi
 echo
 
-# Map a component name to its unit-file name.
+# Map a component name to its unit-file name ('' for non-systemd components).
 unit_name() {
     case "$1" in
         soundserver) echo "soundserver.service" ;;
         sms)         echo "sms_gateway.service" ;;
+        call)        echo "call_intercom.service" ;;
         uptime)      echo "uptime_monitor.service" ;;
+        *)           echo "" ;;
     esac
+}
+
+# Read a KEY=value from the repo .env, with a fallback default.
+getenv() {
+    local val
+    val="$(grep -E "^$1=" "$REPO_DIR/.env" 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '[:space:]')"
+    echo "${val:-$2}"
 }
 
 # ---------------------------------------------------------------------------
@@ -220,7 +243,7 @@ enable_start() {
 # ---------------------------------------------------------------------------
 install_soundserver() {
     local port bindir
-    port="$(grep -E '^SOUND_SERVER_PORT=' "$REPO_DIR/.env" 2>/dev/null | cut -d= -f2)"; port="${port:-5000}"
+    port="$(getenv SOUND_SERVER_PORT 5000)"
     ensure_system_pkgs ffmpeg sox aplay openssl
     mkdir -p "$FLASK_DIR/wav" "$FLASK_DIR/tts_cache"
     chown -R "$SERVICE_USER" "$FLASK_DIR/wav" "$FLASK_DIR/tts_cache"
@@ -261,7 +284,7 @@ WantedBy=multi-user.target"
 
 install_sms() {
     local port bindir
-    port="$(grep -E '^SMS_WEB_PORT=' "$REPO_DIR/.env" 2>/dev/null | cut -d= -f2)"; port="${port:-5010}"
+    port="$(getenv SMS_WEB_PORT 5010)"
     bindir="$(ensure_venv "$SMS_DIR" Flask pyserial python-dotenv)"
     usermod -aG dialout "$SERVICE_USER" 2>/dev/null || true
 
@@ -283,6 +306,34 @@ RestartSec=10
 WantedBy=multi-user.target"
     enable_start "sms_gateway.service"
     ok "SMS Gateway: http://<pi-ip>:$port"
+}
+
+install_call() {
+    local port bindir
+    port="$(getenv CALL_WEB_PORT 5020)"
+    # call.py drives the modem (serial) AND plays/records audio (arecord|sox|aplay).
+    ensure_system_pkgs sox aplay arecord
+    bindir="$(ensure_venv "$CALL_DIR" Flask pyserial python-dotenv)"
+    usermod -aG dialout,audio "$SERVICE_USER" 2>/dev/null || true
+
+    write_unit "call_intercom.service" "[Unit]
+Description=SoundServer Call Intercom (SIM800L auto-answer + broadcast)
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+SupplementaryGroups=dialout audio
+WorkingDirectory=$CALL_DIR
+ExecStart=$bindir/python $CALL_DIR/call.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target"
+    enable_start "call_intercom.service"
+    ok "Call Intercom: http://<pi-ip>:$port"
 }
 
 install_uptime() {
@@ -308,12 +359,92 @@ WantedBy=multi-user.target"
     warn "uptime: edit TARGET_IP / AUDIO_DEVICE / WAV paths in uptime/monitor_connection.py if needed."
 }
 
+# --- Caddy portal (HTTP :80 landing page linking to the dashboards) ---
+ensure_caddy() {
+    command -v caddy >/dev/null 2>&1 && return 0
+    if ! command -v apt-get >/dev/null 2>&1; then
+        die "Caddy is not installed and apt-get is unavailable. Install Caddy, then re-run with 'caddy'."
+    fi
+    log "Installing Caddy from its official apt repository"
+    apt-get install -y -qq debian-keyring debian-archive-keyring apt-transport-https curl gnupg >/dev/null
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+        | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+        > /etc/apt/sources.list.d/caddy-stable.list
+    apt-get update -qq && apt-get install -y caddy >/dev/null
+    command -v caddy >/dev/null 2>&1 || die "Caddy auto-install failed — install it manually and re-run."
+    ok "Caddy installed"
+}
+
+install_caddy() {
+    ensure_caddy
+    local src="$REPO_DIR/deploy/caddy/site"
+    [ -f "$src/index.html" ] || die "Portal page not found at $src/index.html"
+
+    # Publish the portal to a world-readable path (the caddy user can't traverse /home).
+    log "Publishing portal to $PORTAL_ROOT"
+    mkdir -p "$PORTAL_ROOT"
+    install -m 0644 "$src/index.html" "$PORTAL_ROOT/index.html"
+    # Inject the live ports so the landing page links to the right places.
+    cat > "$PORTAL_ROOT/config.js" <<CFG
+window.SS_PORTS = { sound: $(getenv SOUND_SERVER_PORT 5000), sms: $(getenv SMS_WEB_PORT 5010), call: $(getenv CALL_WEB_PORT 5020) };
+CFG
+    chmod -R a+rX "$PORTAL_ROOT"
+
+    # Write the Caddyfile (backing up any pre-existing one, once).
+    mkdir -p "$(dirname "$CADDYFILE")"
+    if [ -f "$CADDYFILE" ] && ! grep -q 'Managed by SoundServer' "$CADDYFILE" 2>/dev/null; then
+        cp "$CADDYFILE" "$CADDYFILE.pre-soundserver"
+        warn "Backed up existing Caddyfile to $CADDYFILE.pre-soundserver"
+    fi
+    cat > "$CADDYFILE" <<CADDY
+# Managed by SoundServer deploy/install.sh — edit deploy/caddy/ and re-run.
+:80 {
+    root * $PORTAL_ROOT
+    file_server
+    encode gzip
+}
+CADDY
+    systemctl enable caddy >/dev/null 2>&1 || true
+    if command -v caddy >/dev/null 2>&1 && caddy validate --config "$CADDYFILE" >/dev/null 2>&1; then
+        systemctl reload caddy 2>/dev/null || systemctl restart caddy
+    else
+        systemctl restart caddy
+    fi
+    sleep 1
+    if systemctl is-active --quiet caddy; then
+        ok "Portal is live:  http://<pi-ip>/  (port 80)"
+    else
+        warn "caddy did not become active — check: journalctl -u caddy -n 40 --no-pager"
+    fi
+}
+
+uninstall_caddy() {
+    if [ ! -f "$CADDYFILE" ] || ! grep -q 'Managed by SoundServer' "$CADDYFILE" 2>/dev/null; then
+        warn "Caddy portal not managed here — leaving Caddy untouched."
+    elif [ -f "$CADDYFILE.pre-soundserver" ]; then
+        mv "$CADDYFILE.pre-soundserver" "$CADDYFILE"
+        systemctl reload caddy 2>/dev/null || systemctl restart caddy 2>/dev/null || true
+        ok "Restored previous Caddyfile"
+    else
+        rm -f "$CADDYFILE"
+        systemctl stop caddy 2>/dev/null || true
+        systemctl disable caddy 2>/dev/null || true
+        ok "Removed SoundServer Caddyfile and stopped caddy"
+    fi
+    rm -rf "$PORTAL_ROOT"
+}
+
 # ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
-# 1) Always uninstall the old units first.
+# 1) Always uninstall the old services first.
 for comp in "${COMPONENTS[@]}"; do
-    uninstall_unit "$(unit_name "$comp")"
+    if [ "$comp" = "caddy" ]; then
+        uninstall_caddy
+    else
+        uninstall_unit "$(unit_name "$comp")"
+    fi
 done
 systemctl daemon-reload
 echo
@@ -331,7 +462,9 @@ for comp in "${COMPONENTS[@]}"; do
     case "$comp" in
         soundserver) install_soundserver ;;
         sms)         install_sms ;;
+        call)        install_call ;;
         uptime)      install_uptime ;;
+        caddy)       install_caddy ;;
     esac
     echo
 done
