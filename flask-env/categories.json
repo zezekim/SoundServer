@@ -1,0 +1,79 @@
+{
+  "Alarmo": [
+    "security_armed.wav",
+    "security_disabled.wav"
+  ],
+  "Big Siren": [
+    "bigsiren.wav",
+    "akyat_bahay.wav",
+    "babala.wav",
+    "no_parking.wav",
+    "bawal_umihi_dito.wav"
+  ],
+  "Notifications": [
+    "notifications_enabled.wav",
+    "notifications_disabled.wav"
+  ],
+  "Person Detection - Detected": [
+    "detected_back_perimeter.wav",
+    "detected_roof.wav",
+    "detected_back_door.wav",
+    "detected_side.wav",
+    "detected_garage.wav",
+    "detected_garden.wav"
+  ],
+  "Person Detection - Left": [
+    "left_back_perimeter.wav",
+    "left_roof.wav",
+    "left_back_door.wav",
+    "left_side.wav",
+    "left_garage.wav",
+    "left_garden.wav"
+  ],
+  "Person Detection - Still Present": [
+    "still_present_back_perimeter.wav",
+    "still_present_roof.wav",
+    "still_present_back_door.wav",
+    "still_present_side.wav",
+    "still_present_garage.wav",
+    "still_present_garden.wav"
+  ],
+  "UV Index Update": [
+    "uv_low.wav",
+    "uv_moderate.wav",
+    "uv_high.wav",
+    "uv_veryhigh.wav",
+    "uv_extreme.wav"
+  ],
+  "Weather - Air Update": [
+    "air_good.wav",
+    "air_moderate.wav",
+    "air_elevated.wav",
+    "air_poor.wav",
+    "air_unhealthy.wav"
+  ],
+  "Weather Update": [
+    "low_pressure.wav",
+    "high_pressure.wav",
+    "humid.wav",
+    "windy.wav",
+    "fair.wav"
+  ],
+  "Welcome": [
+    "welcome.wav",
+    "welcome_bianca.wav",
+    "welcome_ramil.wav",
+    "welcome_ramil_and_bianca.wav"
+  ],
+  "Unassigned": [
+    "bawal_tumambay_dito.wav",
+    "maingay_kapitbahay.wav",
+    "may_tao_sa_gate.wav",
+    "sprinkler.wav",
+    "token_invalid.wav",
+    "bobo_tofu.wav",
+    "chime.wav",
+    "test_mode.wav",
+    "washing_machine.wav"
+  ]
+}

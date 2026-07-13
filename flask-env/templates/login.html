@@ -1,0 +1,16 @@
+<!doctype html>
+<title>Login</title>
+<h2>Admin Login</h2>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul>
+    {% for category, message in messages %}
+      <li style="color:red">{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+<form method="post">
+  Password: <input type="password" name="password" required>
+  <button type="submit">Login</button>
+</form>

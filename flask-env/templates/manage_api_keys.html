@@ -1,0 +1,37 @@
+<!doctype html>
+<title>Manage API Keys</title>
+<h2>API Keys</h2>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul>
+    {% for category, message in messages %}
+      <li style="color:green">{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+<table border="1" cellpadding="5" cellspacing="0">
+  <thead>
+    <tr><th>API Key</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for key in keys|sort %}
+    <tr>
+      <td style="font-family: monospace;">{{ key }}</td>
+      <td>
+        <form method="post" action="{{ url_for('delete_api_key', key=key) }}" style="display:inline" onsubmit="return confirm('Delete this API key?');">
+          <button type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="2">No API keys yet</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<form method="post" action="{{ url_for('add_api_key') }}">
+  <button type="submit">Generate New API Key</button>
+</form>
+
+<p><a href="{{ url_for('logout') }}">Logout</a></p>

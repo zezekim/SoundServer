@@ -1,0 +1,21 @@
+{
+    "card_labels": {
+        "1": "Indoor",
+        "2": "SIM Input",
+        "3": "Outdoor",
+        "0": "",
+        "4": ""
+    },
+    "chime": {
+        "card_id": "1",
+        "control": "Speaker",
+        "volume": 75
+    },
+    "call_broadcast": {
+        "card_id": "3",
+        "control": "Speaker",
+        "volume": 100
+    },
+    "call_input_card_id": "2",
+    "answer_delay_seconds": 1
+}

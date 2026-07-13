@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Call.py Controller</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 2em; background-color: #f8f9fa; color: #212529; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2em; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #343a40; }
+        h1, h2 { border-bottom: 1px solid #dee2e6; padding-bottom: 0.5em; margin-bottom: 1em; }
+        hr { margin: 2em 0; border: 0; border-top: 1px solid #eee; }
+        label { display: block; font-weight: bold; margin-bottom: 0.5em; }
+        .form-group { margin-bottom: 1.5em; }
+        .config-group { border: 1px solid #e9ecef; padding: 1.5em; margin-bottom: 1em; border-radius: 5px; }
+        select, input[type="text"], input[type="number"] { width: 100%; padding: 0.5em; border-radius: 4px; border: 1px solid #ced4da; font-size: 1em; box-sizing: border-box; }
+        input[type="range"] { width: 100%; vertical-align: middle;}
+        .btn { display: inline-block; font-weight: 400; color: #ffffff; background-color: #007bff; border: 1px solid #007bff; padding: 0.5em 1em; font-size: 1em; border-radius: 4px; cursor: pointer; text-decoration: none; }
+        .btn:hover { background-color: #0069d9; border-color: #0062cc; }
+        .alert { padding: 1em; margin-bottom: 1em; border: 1px solid transparent; border-radius: 4px; }
+        .alert-success { color: #0f5132; background-color: #d1e7dd; border-color: #badbcc; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+        th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #dee2e6; vertical-align: middle; }
+        th { font-weight: bold; }
+        td:nth-child(3) { width: 150px; } /* Volume Slider */
+        td:nth-child(4) { width: 100px; text-align: center; } /* Test Button */
+        code { background-color: #e9ecef; padding: 2px 4px; border-radius: 3px; }
+        .flex-group { display: flex; gap: 1em; align-items: flex-end; }
+        .flex-group > div { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Call.py Controller</h1>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="alert alert-success" role="alert">{{ messages[0] }}</div>
+            {% endif %}
+        {% endwith %}
+        
+        <h2>Device Management & Testing</h2>
+        <p>Assign custom labels. Use the sliders and test buttons to identify each output device.</p>
+        <form action="/save_labels" method="post">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Card ID</th><th>System Name</th><th>Custom Label</th><th>Live Test Volume</th><th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for card in all_cards %}
+                    <tr>
+                        <td><code>card {{ card.id }}</code></td>
+                        <td>{{ card.name }}</td>
+                        <td>
+                            <input type="text" name="label_{{ card.id }}" value="{{ card.label }}" placeholder="e.g., Indoor Speaker">
+                        </td>
+                        {% if card.is_output %}
+                        <td><input type="range" id="slider_{{ card.id }}" min="0" max="100" value="75"></td>
+                        <td><button type="button" class="btn" onclick="testSpeaker('{{ card.id }}')">Test</button></td>
+                        {% else %}
+                        <td colspan="2" style="text-align: center;"><em>(Input Device)</em></td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <br>
+            <input type="submit" class="btn" value="Save All Labels">
+        </form>
+
+        <hr>
+
+        <h2>Role Configuration</h2>
+        <p>Assign roles and set defaults. **Find mixer control names** (e.g., 'PCM' or 'Speaker') with `alsamixer`.</p>
+        <form action="/save_config" method="post">
+            <div class="config-group">
+                <h3>Call Handling</h3>
+                 <div class="form-group" style="max-width: 200px;">
+                    <label for="answer_delay">Answer After (seconds):</label>
+                    <input type="number" name="answer_delay" id="answer_delay" value="{{ config.answer_delay_seconds }}" min="1" max="60">
+                </div>
+            </div>
+            <div class="config-group">
+                <h3>Call Audio Input (from SIM800L)</h3>
+                <div class="form-group">
+                    <label for="call_input_card">Device:</label>
+                    <select name="call_input_card" id="call_input_card">
+                        {% for card in all_cards %}{% if card.is_input %}
+                        <option value="{{ card.id }}" {% if card.id == config.call_input_card_id %}selected{% endif %}>{{ card.label or card.name }} (card {{ card.id }})</option>
+                        {% endif %}{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="config-group">
+                <h3>Chime Speaker</h3>
+                <div class="flex-group">
+                    <div class="form-group">
+                        <label for="chime_card">Device:</label>
+                        <select name="chime_card" id="chime_card">
+                            {% for card in all_cards %}{% if card.is_output %}
+                            <option value="{{ card.id }}" {% if card.id == config.chime.card_id %}selected{% endif %}>{{ card.label or card.name }} (card {{ card.id }})</option>
+                            {% endif %}{% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="chime_control">Mixer Control:</label>
+                        <input type="text" name="chime_control" value="{{ config.chime.control }}" placeholder="e.g., PCM or Speaker">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="chime_volume">Default Volume:</label>
+                    <input type="range" name="chime_volume" min="0" max="100" value="{{ config.chime.volume }}">
+                </div>
+            </div>
+
+            <div class="config-group">
+                <h3>Live Call Broadcast Speaker</h3>
+                <div class="flex-group">
+                    <div class="form-group">
+                        <label for="call_card">Device:</label>
+                        <select name="call_card" id="call_card">
+                            {% for card in all_cards %}{% if card.is_output %}
+                            <option value="{{ card.id }}" {% if card.id == config.call_broadcast.card_id %}selected{% endif %}>{{ card.label or card.name }} (card {{ card.id }})</option>
+                            {% endif %}{% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="call_control">Mixer Control:</label>
+                        <input type="text" name="call_control" value="{{ config.call_broadcast.control }}" placeholder="e.g., PCM or Speaker">
+                    </div>
+                </div>
+                 <div class="form-group">
+                    <label for="call_volume">Default Volume:</label>
+                    <input type="range" name="call_volume" min="0" max="100" value="{{ config.call_broadcast.volume }}">
+                </div>
+            </div>
+
+            <input type="submit" class="btn" value="Save All Settings">
+        </form>
+    </div>
+
+    <script>
+        function testSpeaker(cardId) {
+            const slider = document.getElementById(`slider_${cardId}`);
+            if (!slider) return;
+            const volume = slider.value;
+            const button = slider.parentElement.nextElementSibling.querySelector('button');
+            const originalButtonText = button.innerText;
+
+            button.innerText = 'Playing...';
+            button.disabled = true;
+
+            // CORRECTED: The URL now sends the simple cardId, not the full "hw:X,Y" string.
+            // The Python route will construct the full deviceId from this.
+            fetch(`/test_play/${cardId}/${volume}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Test play response:', data);
+                    if (!data.success) { alert(`Error: ${data.error}`); }
+                })
+                .catch(error => { console.error('API Error:', error); alert(`API Error: ${error}`); })
+                .finally(() => { setTimeout(() => { button.innerText = originalButtonText; button.disabled = false; }, 500); });
+        }
+    </script>
+</body>
+</html>

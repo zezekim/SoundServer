@@ -1,0 +1,52 @@
+# --- Python virtual environments (bundled inside component dirs) ---
+flask-env/bin/
+flask-env/lib/
+flask-env/lib64
+flask-env/include/
+flask-env/share/
+flask-env/pyvenv.cfg
+sms/venv/
+call/venv-call/
+
+# --- Byte-compiled / cache ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# --- Editor / backup cruft ---
+*~
+*.bak
+*.backup
+*.working.*
+*.bk.working
+index.html.bk.working
+app.py.working.*
+
+# --- Secrets & TLS material (DO NOT COMMIT) ---
+*.pem
+api_keys.json
+api_keys.txt
+flask-env/api_keys.json
+
+# --- Large / generated assets ---
+*.tar
+flask-env/wav/
+flask-env/tts_cache/
+flask-env/uploads/
+flask-env/backup/
+sound/wav/
+uptime/wav/*.wav
+
+# --- Runtime logs & data ---
+*.log
+*.csv
+flask-env/last_played.json
+sound/last_played.log
+sound/playback.log
+minicom.log
+tts_log.txt
+
+# scratch audio artifacts
+call/chime_mono.wav
+call/test_capture.wav
+test/
