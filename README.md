@@ -141,6 +141,36 @@ The top-level `requirements.txt` captures the Sound Server's full environment
 earlier TTS experiments; only Flask, gTTS, pydub, python-dotenv, and gunicorn are
 needed to run `app.py`).
 
+### 3. Install as systemd services (Raspberry Pi)
+
+On the Pi, the services run under **systemd**. `deploy/install.sh` reconstructs
+that setup — it **uninstalls the old unit(s)** then installs fresh ones for the
+current checkout (creating virtualenvs, generating a `.env` with fresh secrets if
+none exists, and a self-signed TLS cert for the Sound Server's HTTPS):
+
+```bash
+sudo ./deploy/install.sh                 # (re)install soundserver.service only
+sudo ./deploy/install.sh all             # soundserver + sms_gateway + uptime_monitor
+sudo ./deploy/install.sh soundserver sms # pick specific components
+sudo ./deploy/install.sh --uninstall all # only remove the services
+```
+
+It runs services as the user behind `sudo` (override with `SERVICE_USER=<name>`).
+Manage them the usual way:
+
+```bash
+systemctl status soundserver.service
+journalctl -u soundserver.service -f
+```
+
+| Service | Unit | Runs |
+|---------|------|------|
+| Sound Server | `soundserver.service` | `flask-env/app.py` via gunicorn, HTTPS on :5000 |
+| SMS Gateway | `sms_gateway.service` | `sms/sms.py` on :5010 |
+| Uptime Monitor | `uptime_monitor.service` | `uptime/monitor_connection.py` |
+
+(`call/call.py` has no unit — on the original Pi it was always run manually.)
+
 ### Preparing sounds
 
 Source prompts live in `sound/*.mp3`. Convert them to the padded WAV files the
@@ -197,6 +227,9 @@ soundserver/
 ├── uptime/               # network up/down chime
 │   └── monitor_connection.py
 ├── sound/                # master .mp3 prompt library
+├── deploy/
+│   └── install.sh        # (un)install systemd services
 ├── mp3_to_padded_wav.sh  # mp3 -> padded wav converter
+├── .env.example          # config template (copy to .env)
 └── requirements.txt
 ```

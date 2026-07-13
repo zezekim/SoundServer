@@ -19,6 +19,12 @@ config and (in the original deployment) its own virtualenv. Read the top-level
 There is **no build step and no test suite.** These are plain Python scripts run
 directly (or the Sound Server under gunicorn via `flask-env/gunicorn_config.py`).
 
+On the Pi they run as **systemd services** (`soundserver.service`,
+`sms_gateway.service`, `uptime_monitor.service`). `deploy/install.sh` uninstalls
+the old units and installs fresh ones for the current checkout — if you change a
+service's entry point, ports, or venv layout, update the matching unit heredoc in
+that script. `call.py` has no unit (run manually).
+
 ## Architecture patterns to preserve
 
 - **Serialized playback via a worker thread.** `flask-env/app.py` never calls

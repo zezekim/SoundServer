@@ -52,3 +52,6 @@ call/chime_mono.wav
 call/test_capture.wav
 test/
 *.pre-redesign
+
+# local shell history (kept out of the repo — infra details)
+history.txt
