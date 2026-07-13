@@ -83,12 +83,6 @@
 
         <p class="bg-svc" id="bg-svc"></p>
 
-        <div class="note" id="https-note" style="display:none">
-            ⚠️ The Sound Server uses a self-signed HTTPS certificate. Your browser will warn on
-            first visit (accept it to continue), and its status dot below may show
-            <strong>unreachable</strong> until you've accepted the certificate once.
-        </div>
-
         <footer>Served by Caddy on port 80 · SoundServer</footer>
     </div>
 
@@ -98,7 +92,7 @@
         const host = location.hostname || 'localhost';
 
         const SERVICES = [
-            { key: 'sound', icon: '🔊', name: 'Sound Server',  scheme: 'https', port: P.sound,
+            { key: 'sound', icon: '🔊', name: 'Sound Server',  scheme: 'http', port: P.sound,
               desc: 'Play sound clips and text-to-speech to any speaker, mix backgrounds, manage the sound library and volumes.' },
             { key: 'sms',   icon: '✉️', name: 'SMS Gateway',   scheme: 'http',  port: P.sms,
               desc: 'Send and receive SMS through the SIM800L, with a live inbox feed and signal-strength readout.' },
@@ -110,11 +104,9 @@
         ];
 
         const cardsEl = document.getElementById('cards');
-        let hasHttps = false;
 
         SERVICES.forEach(svc => {
             const url = `${svc.scheme}://${host}:${svc.port}`;
-            if (svc.scheme === 'https') hasHttps = true;
             const a = document.createElement('a');
             a.className = 'card'; a.href = url;
             a.innerHTML = `
@@ -138,8 +130,6 @@
         document.getElementById('bg-svc').innerHTML =
             'Also running in the background: ' +
             BACKGROUND.map(b => `<strong>${b.name}</strong> — ${b.desc}`).join(' ');
-
-        if (hasHttps) document.getElementById('https-note').style.display = '';
 
         function setStatus(key, state, text) {
             const el = document.querySelector(`.status[data-key="${key}"]`);

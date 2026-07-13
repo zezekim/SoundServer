@@ -146,8 +146,8 @@ needed to run `app.py`).
 On the Pi, the services run under **systemd**, fronted by a **Caddy portal on
 port 80**. `deploy/install.sh` reconstructs the whole setup — it **uninstalls the
 old unit(s)** then installs fresh ones for the current checkout (creating
-virtualenvs, generating a `.env` with fresh secrets if none exists, a self-signed
-TLS cert for the Sound Server's HTTPS, and the Caddy landing page):
+virtualenvs, generating a `.env` with fresh secrets if none exists, and the Caddy
+landing page):
 
 ```bash
 sudo ./deploy/install.sh                 # (re)install soundserver.service only
@@ -167,7 +167,7 @@ journalctl -u soundserver.service -f
 | Component | Unit | Runs |
 |-----------|------|------|
 | **Portal** | `caddy` | Landing page on **HTTP :80** linking to the dashboards below |
-| Sound Server | `soundserver.service` | `flask-env/app.py` via gunicorn, HTTPS on :5000 |
+| Sound Server | `soundserver.service` | `flask-env/app.py` via gunicorn, HTTP on :5000 |
 | SMS Gateway | `sms_gateway.service` | `sms/sms.py` on :5010 |
 | Call Intercom | `call_intercom.service` | `call/call.py` on :5020 |
 | Uptime Monitor | `uptime_monitor.service` | `uptime/monitor_connection.py` (no dashboard) |
@@ -176,7 +176,7 @@ journalctl -u soundserver.service -f
 `http://<pi>/`. It auto-discovers the Pi's hostname and links to each service's
 own dashboard on its own port (with a best-effort online/offline indicator) — the
 Flask apps are linked directly rather than reverse-proxied, since they use
-absolute paths and the Sound Server terminates its own HTTPS.
+absolute paths.
 
 > **Note:** `sms_gateway` and `call_intercom` share the single SIM800L on
 > `/dev/ttyS0` and cannot both run at once — `install.sh` warns about this and

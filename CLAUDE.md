@@ -27,9 +27,10 @@ units and installs fresh ones for the current checkout — if you change a
 service's entry point, ports, or venv layout, update the matching unit heredoc in
 that script; if you add a service with a dashboard, add it to the portal's
 `SERVICES` array and `install_caddy`'s `config.js` ports. The portal links to the
-apps directly (not reverse-proxied) because they use absolute paths and the Sound
-Server serves its own HTTPS. `sms_gateway` and `call_intercom` share `/dev/ttyS0`
-and can't run simultaneously.
+apps directly (not reverse-proxied) because they use absolute paths. All services
+serve plain HTTP on the LAN (gunicorn runs the Sound Server without TLS — front it
+with Caddy if you ever need HTTPS). `sms_gateway` and `call_intercom` share
+`/dev/ttyS0` and can't run simultaneously.
 
 ## Architecture patterns to preserve
 

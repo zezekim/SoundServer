@@ -4,8 +4,8 @@
 #
 # Uninstalls the OLD systemd unit(s) (stop, disable, remove) and installs the
 # NEW ones for this checkout — creating per-component virtualenvs, ensuring a
-# .env, generating a self-signed TLS cert for the Sound Server, and wiring the
-# gunicorn-based service exactly as documented in history.txt.
+# .env, and wiring the gunicorn-based Sound Server plus the SMS, Call, uptime,
+# and Caddy-portal services.
 #
 # Components:
 #     soundserver.service     -> flask-env/app.py via gunicorn (HTTPS :5000)
@@ -244,24 +244,15 @@ enable_start() {
 install_soundserver() {
     local port bindir
     port="$(getenv SOUND_SERVER_PORT 5000)"
-    ensure_system_pkgs ffmpeg sox aplay openssl
+    ensure_system_pkgs ffmpeg sox aplay
     mkdir -p "$FLASK_DIR/wav" "$FLASK_DIR/tts_cache"
     chown -R "$SERVICE_USER" "$FLASK_DIR/wav" "$FLASK_DIR/tts_cache"
-
-    # Self-signed TLS cert for gunicorn (matches history: openssl req -x509 ...).
-    if [ ! -f "$FLASK_DIR/cert.pem" ] || [ ! -f "$FLASK_DIR/key.pem" ]; then
-        log "Generating self-signed TLS certificate"
-        openssl req -x509 -newkey rsa:4096 -nodes -days 365 \
-            -keyout "$FLASK_DIR/key.pem" -out "$FLASK_DIR/cert.pem" \
-            -subj "/CN=soundserver.local" >/dev/null 2>&1
-        chown "$SERVICE_USER" "$FLASK_DIR/key.pem" "$FLASK_DIR/cert.pem"
-        chmod 600 "$FLASK_DIR/key.pem"
-        ok "TLS cert generated"
-    fi
 
     bindir="$(ensure_venv "$FLASK_DIR" Flask gunicorn gTTS pydub python-dotenv)"
     usermod -aG audio "$SERVICE_USER" 2>/dev/null || true
 
+    # Plain HTTP on the LAN — automations call it over http and the port-80 portal
+    # links to it directly. (Put TLS in front with Caddy if you ever need it.)
     write_unit "soundserver.service" "[Unit]
 Description=SoundServer — Flask audio control panel (gunicorn)
 After=network-online.target sound.target
@@ -272,14 +263,14 @@ Type=simple
 User=$SERVICE_USER
 SupplementaryGroups=audio
 WorkingDirectory=$FLASK_DIR
-ExecStart=$bindir/gunicorn --workers 1 -c $FLASK_DIR/gunicorn_config.py --bind 0.0.0.0:$port --certfile=$FLASK_DIR/cert.pem --keyfile=$FLASK_DIR/key.pem app:app
+ExecStart=$bindir/gunicorn --workers 1 -c $FLASK_DIR/gunicorn_config.py --bind 0.0.0.0:$port app:app
 Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target"
     enable_start "soundserver.service"
-    ok "Sound Server: https://<pi-ip>:$port"
+    ok "Sound Server: http://<pi-ip>:$port"
 }
 
 install_sms() {

@@ -5,9 +5,8 @@
 # serve it without needing traversal permission on /home).
 #
 # Serves the landing page on plain HTTP port 80. The page links out to each
-# service's own dashboard on its own port (the Flask apps use absolute paths and
-# the Sound Server terminates its own HTTPS, so they are NOT reverse-proxied at a
-# sub-path — they are linked directly).
+# service's own dashboard on its own port. The Flask apps use absolute paths, so
+# they are NOT reverse-proxied at a sub-path — they are linked directly.
 
 :80 {
     root * /var/www/soundserver
