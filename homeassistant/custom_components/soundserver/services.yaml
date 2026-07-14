@@ -1,0 +1,90 @@
+play:
+  name: Play sound
+  description: Play a sound file from the SoundServer library on a speaker.
+  fields:
+    sound:
+      name: Sound
+      description: The .wav file to play (see the Sound Server library / GET /api/sounds).
+      required: true
+      example: detected_garage.wav
+      selector:
+        text:
+    speaker:
+      name: Speaker
+      description: 'Speaker/device id, e.g. "2,0". Falls back to default_speaker if omitted.'
+      example: "2,0"
+      selector:
+        text:
+    count:
+      name: Repeat
+      description: How many times to play it (1–20).
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 20
+          mode: box
+    background:
+      name: Background
+      description: Optional background sound to mix underneath.
+      example: sprinkler.wav
+      selector:
+        text:
+
+speak:
+  name: Speak text
+  description: Convert text to speech and play it on a speaker.
+  fields:
+    text:
+      name: Text
+      description: What to say.
+      required: true
+      example: Someone is at the gate
+      selector:
+        text:
+    speaker:
+      name: Speaker
+      description: 'Speaker/device id, e.g. "2,0". Falls back to default_speaker if omitted.'
+      example: "2,0"
+      selector:
+        text:
+    lang:
+      name: Language
+      description: gTTS language code.
+      default: en
+      example: en
+      selector:
+        text:
+    background:
+      name: Background
+      description: Optional background sound to mix underneath.
+      selector:
+        text:
+
+set_volume:
+  name: Set volume
+  description: Set a mixer control's volume on a sound card.
+  fields:
+    card:
+      name: Card
+      description: ALSA card index (e.g. "2").
+      required: true
+      example: "2"
+      selector:
+        text:
+    control:
+      name: Control
+      description: Mixer control name.
+      default: Speaker
+      example: Speaker
+      selector:
+        text:
+    volume:
+      name: Volume
+      description: Volume percentage (0–100).
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"

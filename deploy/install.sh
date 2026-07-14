@@ -376,11 +376,12 @@ install_caddy() {
     log "Publishing portal to $PORTAL_ROOT"
     mkdir -p "$PORTAL_ROOT"
     install -m 0644 "$src/index.html" "$PORTAL_ROOT/index.html"
-    # Inject the live ports so the landing page links to the right places.
-    cat > "$PORTAL_ROOT/config.js" <<CFG
-window.SS_PORTS = { sound: $(getenv SOUND_SERVER_PORT 5000), sms: $(getenv SMS_WEB_PORT 5010), call: $(getenv CALL_WEB_PORT 5020) };
-CFG
     chmod -R a+rX "$PORTAL_ROOT"
+
+    local sport smsport callport
+    sport="$(getenv SOUND_SERVER_PORT 5000)"
+    smsport="$(getenv SMS_WEB_PORT 5010)"
+    callport="$(getenv CALL_WEB_PORT 5020)"
 
     # Write the Caddyfile (backing up any pre-existing one, once).
     mkdir -p "$(dirname "$CADDYFILE")"
@@ -388,23 +389,49 @@ CFG
         cp "$CADDYFILE" "$CADDYFILE.pre-soundserver"
         warn "Backed up existing Caddyfile to $CADDYFILE.pre-soundserver"
     fi
+    # Everything on HTTP :80. Each app is reverse-proxied under a sub-path; the
+    # portal (static) is the fallback at /. handle_path strips the prefix and
+    # X-Forwarded-Prefix lets each Flask app rebuild correct links (ProxyFix).
     cat > "$CADDYFILE" <<CADDY
 # Managed by SoundServer deploy/install.sh — edit deploy/caddy/ and re-run.
 :80 {
-    root * $PORTAL_ROOT
-    file_server
     encode gzip
+
+    redir /sound /sound/
+    redir /sms   /sms/
+    redir /call  /call/
+
+    handle_path /sound/* {
+        reverse_proxy 127.0.0.1:$sport {
+            header_up X-Forwarded-Prefix /sound
+        }
+    }
+    handle_path /sms/* {
+        reverse_proxy 127.0.0.1:$smsport {
+            header_up X-Forwarded-Prefix /sms
+        }
+    }
+    handle_path /call/* {
+        reverse_proxy 127.0.0.1:$callport {
+            header_up X-Forwarded-Prefix /call
+        }
+    }
+
+    handle {
+        root * $PORTAL_ROOT
+        file_server
+    }
 }
 CADDY
     systemctl enable caddy >/dev/null 2>&1 || true
-    if command -v caddy >/dev/null 2>&1 && caddy validate --config "$CADDYFILE" >/dev/null 2>&1; then
+    if command -v caddy >/dev/null 2>&1 && caddy validate --adapter caddyfile --config "$CADDYFILE" >/dev/null 2>&1; then
         systemctl reload caddy 2>/dev/null || systemctl restart caddy
     else
         systemctl restart caddy
     fi
     sleep 1
     if systemctl is-active --quiet caddy; then
-        ok "Portal is live:  http://<pi-ip>/  (port 80)"
+        ok "Portal + all dashboards on port 80:  http://<pi-ip>/  (→ /sound  /sms  /call)"
     else
         warn "caddy did not become active — check: journalctl -u caddy -n 40 --no-pager"
     fi

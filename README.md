@@ -166,21 +166,44 @@ journalctl -u soundserver.service -f
 
 | Component | Unit | Runs |
 |-----------|------|------|
-| **Portal** | `caddy` | Landing page on **HTTP :80** linking to the dashboards below |
-| Sound Server | `soundserver.service` | `flask-env/app.py` via gunicorn, HTTP on :5000 |
-| SMS Gateway | `sms_gateway.service` | `sms/sms.py` on :5010 |
-| Call Intercom | `call_intercom.service` | `call/call.py` on :5020 |
+| **Caddy** | `caddy` | Reverse proxy + portal on **HTTP :80** — front door to everything |
+| Sound Server | `soundserver.service` | `flask-env/app.py` via gunicorn (:5000 → `/sound`) |
+| SMS Gateway | `sms_gateway.service` | `sms/sms.py` (:5010 → `/sms`) |
+| Call Intercom | `call_intercom.service` | `call/call.py` (:5020 → `/call`) |
 | Uptime Monitor | `uptime_monitor.service` | `uptime/monitor_connection.py` (no dashboard) |
 
-**The portal** (`deploy/caddy/`) is a static page served by Caddy at
-`http://<pi>/`. It auto-discovers the Pi's hostname and links to each service's
-own dashboard on its own port (with a best-effort online/offline indicator) — the
-Flask apps are linked directly rather than reverse-proxied, since they use
-absolute paths.
+**Everything lives behind Caddy on port 80.** The portal landing page is at
+`http://<pi>/`, and each dashboard is reverse-proxied under a sub-path:
+
+| URL | Dashboard |
+|-----|-----------|
+| `http://<pi>/` | Portal (links + live status of each service) |
+| `http://<pi>/sound/` | Sound Server |
+| `http://<pi>/sms/` | SMS Gateway |
+| `http://<pi>/call/` | Call Intercom |
+
+Caddy strips the sub-path and passes `X-Forwarded-Prefix`; each Flask app uses
+`werkzeug`'s `ProxyFix` + a `BASE` prefix in its templates so links, forms, and
+`fetch()` calls work under the sub-path. The apps still listen on their own ports
+too, so `http://<pi>:5000` etc. keep working for existing clients.
 
 > **Note:** `sms_gateway` and `call_intercom` share the single SIM800L on
 > `/dev/ttyS0` and cannot both run at once — `install.sh` warns about this and
 > enables both, but stop one before starting the other.
+
+## Home Assistant integration
+
+`homeassistant/` provides a drop-in **custom integration** that adds
+`soundserver.play`, `soundserver.speak`, and `soundserver.set_volume` services
+(plus a `rest_command` package alternative). Point it at `http://<pi>/sound` and
+call it from automations. See [`homeassistant/README.md`](homeassistant/README.md).
+
+```yaml
+service: soundserver.speak
+data:
+  text: "Someone is at the gate"
+  speaker: "2,0"
+```
 
 ### Preparing sounds
 
@@ -239,8 +262,9 @@ soundserver/
 │   └── monitor_connection.py
 ├── sound/                # master .mp3 prompt library
 ├── deploy/
-│   ├── install.sh        # (un)install systemd services + Caddy portal
+│   ├── install.sh        # (un)install systemd services + Caddy reverse proxy
 │   └── caddy/            # portal landing page + reference Caddyfile
+├── homeassistant/        # HA custom integration + rest_command package
 ├── mp3_to_padded_wav.sh  # mp3 -> padded wav converter
 ├── .env.example          # config template (copy to .env)
 └── requirements.txt

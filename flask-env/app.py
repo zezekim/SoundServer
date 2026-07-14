@@ -11,6 +11,7 @@ import uuid
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 from gtts import gTTS
 from pydub import AudioSegment
 
@@ -19,6 +20,10 @@ load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, '.env'))
 
 app = Flask(__name__)
+# Honour X-Forwarded-* from the Caddy reverse proxy so the app works both directly
+# (http://pi:5000/) and mounted under a sub-path (http://pi/sound/). X-Forwarded-Prefix
+# populates request.script_root, which url_for() and the templates use to build links.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # --- Configuration (env-overridable; see .env.example) ---
 SOUND_FOLDER = os.environ.get('SOUND_FOLDER', '/home/rs/flask-env/wav')

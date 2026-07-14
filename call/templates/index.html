@@ -41,7 +41,7 @@
         
         <h2>Device Management & Testing</h2>
         <p>Assign custom labels. Use the sliders and test buttons to identify each output device.</p>
-        <form action="/save_labels" method="post">
+        <form action="{{ request.script_root }}/save_labels" method="post">
             <table>
                 <thead>
                     <tr>
@@ -74,7 +74,7 @@
 
         <h2>Role Configuration</h2>
         <p>Assign roles and set defaults. **Find mixer control names** (e.g., 'PCM' or 'Speaker') with `alsamixer`.</p>
-        <form action="/save_config" method="post">
+        <form action="{{ request.script_root }}/save_config" method="post">
             <div class="config-group">
                 <h3>Call Handling</h3>
                  <div class="form-group" style="max-width: 200px;">
@@ -142,6 +142,8 @@
     </div>
 
     <script>
+        // Mount prefix when served behind the Caddy proxy (e.g. "/call"); "" when hit directly.
+        const BASE = {{ request.script_root | tojson }};
         function testSpeaker(cardId) {
             const slider = document.getElementById(`slider_${cardId}`);
             if (!slider) return;
@@ -154,7 +156,7 @@
 
             // CORRECTED: The URL now sends the simple cardId, not the full "hw:X,Y" string.
             // The Python route will construct the full deviceId from this.
-            fetch(`/test_play/${cardId}/${volume}`)
+            fetch(`${BASE}/test_play/${cardId}/${volume}`)
                 .then(response => response.json())
                 .then(data => {
                     console.log('Test play response:', data);

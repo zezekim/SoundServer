@@ -1,0 +1,11 @@
+{
+  "domain": "soundserver",
+  "name": "SoundServer",
+  "documentation": "https://github.com/zezekim/SoundServer",
+  "issue_tracker": "https://github.com/zezekim/SoundServer/issues",
+  "codeowners": ["@zezekim"],
+  "dependencies": [],
+  "requirements": [],
+  "iot_class": "local_polling",
+  "version": "1.0.0"
+}

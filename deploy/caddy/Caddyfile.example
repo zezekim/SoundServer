@@ -1,15 +1,46 @@
-# SoundServer portal — reference Caddyfile.
+# SoundServer portal + reverse proxy — reference Caddyfile.
 #
-# deploy/install.sh generates the real one at /etc/caddy/Caddyfile, copying the
-# portal to /var/www/soundserver (a world-readable path, so the `caddy` user can
-# serve it without needing traversal permission on /home).
+# deploy/install.sh generates the real one at /etc/caddy/Caddyfile (with the
+# ports from your .env substituted in) and copies the portal page to
+# /var/www/soundserver — a world-readable path so the `caddy` user can serve it
+# without needing traversal permission on /home.
 #
-# Serves the landing page on plain HTTP port 80. The page links out to each
-# service's own dashboard on its own port. The Flask apps use absolute paths, so
-# they are NOT reverse-proxied at a sub-path — they are linked directly.
+# Everything is exposed on plain HTTP port 80:
+#   /            -> the static portal landing page
+#   /sound/*     -> Sound Server   (gunicorn, :5000)
+#   /sms/*       -> SMS Gateway     (:5010)
+#   /call/*      -> Call Intercom   (:5020)
+#
+# handle_path strips the sub-path prefix before proxying, and X-Forwarded-Prefix
+# tells each Flask app (via werkzeug ProxyFix) to rebuild links/redirects under
+# that prefix. The apps still listen on their own ports too, so direct access
+# (http://pi:5000/) keeps working.
 
 :80 {
-    root * /var/www/soundserver
-    file_server
     encode gzip
+
+    redir /sound /sound/
+    redir /sms   /sms/
+    redir /call  /call/
+
+    handle_path /sound/* {
+        reverse_proxy 127.0.0.1:5000 {
+            header_up X-Forwarded-Prefix /sound
+        }
+    }
+    handle_path /sms/* {
+        reverse_proxy 127.0.0.1:5010 {
+            header_up X-Forwarded-Prefix /sms
+        }
+    }
+    handle_path /call/* {
+        reverse_proxy 127.0.0.1:5020 {
+            header_up X-Forwarded-Prefix /call
+        }
+    }
+
+    handle {
+        root * /var/www/soundserver
+        file_server
+    }
 }

@@ -9,12 +9,15 @@ import threading
 import json
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Load secrets/config from a .env file (repo root or CWD). See .env.example.
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, '.env'))
 
 app = Flask(__name__)
+# Work both directly (http://pi:5020/) and behind the Caddy proxy (http://pi/call/).
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = os.environ.get('CALL_FLASK_SECRET_KEY') or os.urandom(32).hex()
 
 # --- Configuration (env-overridable; see .env.example) ---

@@ -26,11 +26,29 @@ static page linking to each dashboard). `deploy/install.sh` uninstalls the old
 units and installs fresh ones for the current checkout — if you change a
 service's entry point, ports, or venv layout, update the matching unit heredoc in
 that script; if you add a service with a dashboard, add it to the portal's
-`SERVICES` array and `install_caddy`'s `config.js` ports. The portal links to the
-apps directly (not reverse-proxied) because they use absolute paths. All services
-serve plain HTTP on the LAN (gunicorn runs the Sound Server without TLS — front it
-with Caddy if you ever need HTTPS). `sms_gateway` and `call_intercom` share
-`/dev/ttyS0` and can't run simultaneously.
+`SERVICES` array and `install_caddy`'s the portal's `SERVICES` list. All services serve
+plain HTTP on the LAN. `sms_gateway` and `call_intercom` share `/dev/ttyS0` and
+can't run simultaneously.
+
+**Everything is behind Caddy on port 80.** Caddy reverse-proxies each app under a
+sub-path (`/sound`, `/sms`, `/call`) via `handle_path` (which strips the prefix)
+plus `header_up X-Forwarded-Prefix`. Each Flask app applies
+`werkzeug.middleware.proxy_fix.ProxyFix(..., x_prefix=1)` so `request.script_root`
+becomes the mount prefix, and **every template injects `const BASE =
+{{ request.script_root | tojson }}` and prefixes all `fetch()`/`EventSource`/form
+URLs with `BASE`** (server-side links use `url_for`, which ProxyFix fixes
+automatically). When you add a client-side call or a form, prefix it with `BASE`
+(or `{{ request.script_root }}`) or it will break under the proxy. `BASE` is `""`
+on direct-port access, so both paths work.
+
+## Home Assistant (`homeassistant/`)
+
+A YAML-configured custom integration (`custom_components/soundserver/`) registering
+`soundserver.play` / `speak` / `set_volume` services that call the HTTP API, plus a
+`rest_command` package alternative. It targets the API base URL (usually
+`http://<pi>/sound`). If you add or rename an API endpoint, update the service
+handlers in `__init__.py` and `services.yaml`. It's an *integration*, not a
+Supervisor add-on (the sound server needs the Pi's ALSA/serial hardware directly).
 
 ## Architecture patterns to preserve
 

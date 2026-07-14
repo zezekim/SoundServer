@@ -322,6 +322,8 @@
         const allSoundFiles = {{ files | tojson }};
         const allDevices = {{ discovered_devices | tojson }};
         const allCardsForLabeling = {{ cards_for_labeling | tojson }};
+        // Mount prefix when served behind the Caddy proxy (e.g. "/sound"); "" when hit directly.
+        const BASE = {{ request.script_root | tojson }};
         let categoriesData = {};
         let editMode = false;
         let sortables = [];
@@ -355,7 +357,7 @@
             const device = activeSpeaker();
             if (!device) { showToast('Pick a speaker in the top bar first.', 'error'); return; }
             const count = repeatCount();
-            let url = `/play/${device}/${encodeURIComponent(filename)}/${count}`;
+            let url = `${BASE}/play/${device}/${encodeURIComponent(filename)}/${count}`;
             if (activeBg()) url += `?background=${encodeURIComponent(activeBg())}`;
             if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = '⏳'; }
             fetch(url)
@@ -369,7 +371,7 @@
             const files = Array.from(listEl.querySelectorAll('.tile')).map(t => t.dataset.filename);
             if (!files.length) { showToast('Nothing to play here.', 'error'); return; }
             files.forEach(f => {
-                let url = `/play/${activeSpeaker()}/${encodeURIComponent(f)}/1`;
+                let url = `${BASE}/play/${activeSpeaker()}/${encodeURIComponent(f)}/1`;
                 if (activeBg()) url += `?background=${encodeURIComponent(activeBg())}`;
                 fetch(url).catch(() => {});
             });
@@ -382,7 +384,7 @@
             const newName = prompt(`Rename "${oldName}" (must end in .wav):`, oldName);
             if (!newName || newName === oldName) return;
             if (!newName.toLowerCase().endsWith('.wav')) { showToast('Name must end with .wav', 'error'); return; }
-            fetch('/rename_audio_file', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            fetch(BASE + '/rename_audio_file', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ old_filename: oldName, new_filename: newName }) })
                 .then(r => r.json()).then(d => {
                     if (!d.success) throw new Error(d.message);
@@ -395,7 +397,7 @@
         }
         function deleteFile(filename, tileEl) {
             if (!confirm(`Delete "${filename}"? This cannot be undone.`)) return;
-            fetch(`/delete/${encodeURIComponent(filename)}`, { method: 'POST' })
+            fetch(`${BASE}/delete/${encodeURIComponent(filename)}`, { method: 'POST' })
                 .then(r => r.json().then(d => ({ ok: r.ok, d })))
                 .then(({ ok, d }) => {
                     if (!ok || !d.success) throw new Error(d.message || 'Failed to delete');
@@ -515,7 +517,7 @@
                 layout[name] = [...cat.querySelectorAll('.tile')].map(t => t.dataset.filename);
             });
             layout['Unassigned'] = [...unassignedList.querySelectorAll('.tile')].map(t => t.dataset.filename);
-            fetch('/api/save_layout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(layout) })
+            fetch(BASE + '/api/save_layout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(layout) })
                 .then(r => { if (!r.ok) throw new Error('layout save failed'); return r.json(); })
                 .then(d => { if (!d.success) throw new Error(d.message); showToast('Layout saved.', 'success'); updateCounts(); })
                 .catch(e => showToast(`Save failed: ${e.message}`, 'error'))
@@ -537,7 +539,7 @@
         function saveLabels() {
             const btn = $('save-labels-btn');
             btn.disabled = true; btn.textContent = 'Saving…';
-            fetch('/update_label', { method: 'POST', body: new URLSearchParams(new FormData($('speaker-labels-form'))) })
+            fetch(BASE + '/update_label', { method: 'POST', body: new URLSearchParams(new FormData($('speaker-labels-form'))) })
                 .then(r => r.json()).then(d => {
                     if (!d.success) throw new Error(d.message);
                     showToast('Speaker names saved. Reload to see them everywhere.', 'success');
@@ -582,7 +584,7 @@
             btn.disabled = true; btn.textContent = '🗣 Speaking…';
             const payload = { text, speaker_id: speaker, lang: $('tts-lang').value };
             if (activeBg()) payload.background_sound = activeBg();
-            fetch('/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+            fetch(BASE + '/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
                 .then(r => r.json().then(d => ({ ok: r.ok, d })))
                 .then(({ ok, d }) => { if (!ok || !d.success) throw new Error(d.message); showToast('Queued speech for playback.', 'success'); })
                 .catch(e => showToast(`TTS error: ${e.message}`, 'error'))
@@ -597,7 +599,7 @@
                 const div = document.createElement('div'); div.className = 'vol-card';
                 div.innerHTML = `<h4>${card.user_label || card.default_name} <span class="category-count">(Card ${card.card_index})</span></h4>`;
                 try {
-                    const controls = await (await fetch(`/api/card/${card.card_index}/mixer_controls`)).json();
+                    const controls = await (await fetch(`${BASE}/api/card/${card.card_index}/mixer_controls`)).json();
                     if (controls.error) div.innerHTML += `<p class="empty-state">${controls.error}</p>`;
                     else if (!controls.length) div.innerHTML += '<p class="empty-state">No mixer controls.</p>';
                     else for (const ctl of controls) {
@@ -606,12 +608,12 @@
                         const slider = document.createElement('input'); slider.type = 'range'; slider.min = 0; slider.max = 100;
                         const val = document.createElement('span'); val.className = 'val'; val.textContent = '…';
                         try {
-                            const vd = await (await fetch(`/api/card/${card.card_index}/control/${encodeURIComponent(ctl)}/current_volume`)).json();
+                            const vd = await (await fetch(`${BASE}/api/card/${card.card_index}/control/${encodeURIComponent(ctl)}/current_volume`)).json();
                             if (vd.volume != null) { slider.value = vd.volume; val.textContent = `${vd.volume}%`; }
                             else { val.textContent = 'N/A'; slider.disabled = true; }
                         } catch { val.textContent = 'err'; slider.disabled = true; }
                         slider.oninput = () => val.textContent = `${slider.value}%`;
-                        slider.onchange = () => fetch(`/api/set_volume/${card.card_index}/${encodeURIComponent(ctl)}/${slider.value}`, { method: 'POST' })
+                        slider.onchange = () => fetch(`${BASE}/api/set_volume/${card.card_index}/${encodeURIComponent(ctl)}/${slider.value}`, { method: 'POST' })
                             .then(r => { if (!r.ok) throw new Error(); })
                             .catch(() => showToast(`Failed to set ${ctl} volume.`, 'error'));
                         row.append(label, slider, val); div.appendChild(row);
@@ -667,7 +669,7 @@
         }
         function buildApiDocs() {
             const box = $('api-docs'); if (!box) return;
-            const base = location.origin, spk = sampleSpeaker(), card = sampleCard();
+            const base = location.origin + BASE, spk = sampleSpeaker(), card = sampleCard();
             const f = encodeURIComponent(sampleFile(0)), bg = encodeURIComponent(sampleFile(1));
             box.innerHTML = '';
             box.appendChild(apiEndpoint('GET', '/play/{speaker}/{sound}[/{count}]',
@@ -725,7 +727,7 @@
             populateSpeakerSelects();
             refreshBackgroundOptions();
             loadVolumeControls();
-            fetch('/api/get_layout').then(r => r.json())
+            fetch(BASE + '/api/get_layout').then(r => r.json())
                 .then(d => { categoriesData = d || {}; })
                 .catch(() => { categoriesData = {}; })
                 .finally(() => { populateBoard(); });

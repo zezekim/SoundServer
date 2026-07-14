@@ -13,6 +13,7 @@ from collections import deque
 from datetime import datetime
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template_string, Response
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Load secrets/config from a .env file (repo root or CWD). See .env.example.
 load_dotenv()
@@ -35,6 +36,8 @@ logging.basicConfig(level=logging.INFO,
 # --- Global Objects ---
 ser = None
 app = Flask(__name__)
+# Work both directly (http://pi:5010/) and behind the Caddy proxy (http://pi/sms/).
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 serial_lock = threading.Lock()
 csv_lock = threading.Lock()
 received_messages = deque(maxlen=MAX_MESSAGES)
@@ -82,11 +85,13 @@ HTML_TEMPLATE = """
         .signal-bars-5 .bar { background-color: #555; }
     </style>
     <script>
+        // Mount prefix when served behind the Caddy proxy (e.g. "/sms"); "" when hit directly.
+        const BASE = {{ request.script_root | tojson }};
         function escapeHTML(str) { str = str ? String(str) : ''; return str.replace(/[&<>"']/g, function(match) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[match]; }); }
         function addMessageToList(msg, prepend = false) { const list = document.getElementById('smsList'); const placeholder = document.getElementById('smsPlaceholder'); if (placeholder) { list.innerHTML = ''; } const item = document.createElement('li'); item.innerHTML = `<span class="sender">${escapeHTML(msg.sender)}</span><span class="time">SIM: ${escapeHTML(msg.time)} | Rcvd: ${escapeHTML(msg.received_at)}</span><div class="body">${escapeHTML(msg.body)}</div>`; if (prepend) { list.insertBefore(item, list.firstChild); } else { list.appendChild(item); } }
-        async function loadInitialMessages() { try { const response = await fetch('/api/get_sms'); const messages = await response.json(); const list = document.getElementById('smsList'); list.innerHTML = ''; if (messages.length === 0) { list.innerHTML = '<li id="smsPlaceholder">No messages received yet.</li>'; } else { messages.forEach(msg => addMessageToList(msg, false)); } } catch (error) { console.error("Error fetching messages:", error); document.getElementById('smsList').innerHTML = '<li>Error loading messages.</li>'; } }
-        function connectSSE() { console.log("Connecting to SSE stream..."); const eventSource = new EventSource("/stream"); eventSource.onmessage = function(event) { console.log("SSE Message Received:", event.data); try { const msg = JSON.parse(event.data); addMessageToList(msg, true); } catch(e) { console.error("Failed to parse SSE data:", e); } }; eventSource.onerror = function(err) { console.error("EventSource failed:", err); eventSource.close(); setTimeout(connectSSE, 5000); }; eventSource.onopen = function() { console.log("SSE Connection opened."); }; }
-        async function fetchStatus() { try { const response = await fetch('/api/status'); const status = await response.json(); document.getElementById('phoneNumber').textContent = escapeHTML(status.number || 'Unknown'); document.getElementById('signalMeter').className = 'signal-meter signal-bars-' + (status.signal_bars || 0); } catch (error) { console.error("Error fetching status:", error); document.getElementById('phoneNumber').textContent = 'Error'; document.getElementById('signalMeter').className = 'signal-meter signal-bars-0'; } }
+        async function loadInitialMessages() { try { const response = await fetch(BASE + '/api/get_sms'); const messages = await response.json(); const list = document.getElementById('smsList'); list.innerHTML = ''; if (messages.length === 0) { list.innerHTML = '<li id="smsPlaceholder">No messages received yet.</li>'; } else { messages.forEach(msg => addMessageToList(msg, false)); } } catch (error) { console.error("Error fetching messages:", error); document.getElementById('smsList').innerHTML = '<li>Error loading messages.</li>'; } }
+        function connectSSE() { console.log("Connecting to SSE stream..."); const eventSource = new EventSource(BASE + "/stream"); eventSource.onmessage = function(event) { console.log("SSE Message Received:", event.data); try { const msg = JSON.parse(event.data); addMessageToList(msg, true); } catch(e) { console.error("Failed to parse SSE data:", e); } }; eventSource.onerror = function(err) { console.error("EventSource failed:", err); eventSource.close(); setTimeout(connectSSE, 5000); }; eventSource.onopen = function() { console.log("SSE Connection opened."); }; }
+        async function fetchStatus() { try { const response = await fetch(BASE + '/api/status'); const status = await response.json(); document.getElementById('phoneNumber').textContent = escapeHTML(status.number || 'Unknown'); document.getElementById('signalMeter').className = 'signal-meter signal-bars-' + (status.signal_bars || 0); } catch (error) { console.error("Error fetching status:", error); document.getElementById('phoneNumber').textContent = 'Error'; document.getElementById('signalMeter').className = 'signal-meter signal-bars-0'; } }
         window.onload = function() { loadInitialMessages(); connectSSE(); fetchStatus(); setInterval(fetchStatus, 15000); };
     </script>
 </head>
@@ -96,12 +101,12 @@ HTML_TEMPLATE = """
         <h1>Raspberry Pi SMS Gateway</h1>
          {% if message %} <div class="message {{ 'success' if success else 'error' }}">{{ message }}</div> {% endif %}
         <div style="display: flex; gap: 20px;">
-            <div style="flex: 1;"> <h2>Send SMS</h2> <form method="post" action="/send"> <label for="number">Phone Number (Intl. Format):</label> <input type="tel" id="number" name="number" placeholder="+1234567890" required> <label for="text">Message:</label> <textarea id="text" name="text" rows="4" maxlength="160" required></textarea> <button type="submit">Send SMS</button> </form> </div>
+            <div style="flex: 1;"> <h2>Send SMS</h2> <form method="post" action="{{ request.script_root }}/send"> <label for="number">Phone Number (Intl. Format):</label> <input type="tel" id="number" name="number" placeholder="+1234567890" required> <label for="text">Message:</label> <textarea id="text" name="text" rows="4" maxlength="160" required></textarea> <button type="submit">Send SMS</button> </form> </div>
             <div style="flex: 1;"> <h2>Received SMS (Real-time)</h2> <ul id="smsList" class="sms-list"> <li>Loading messages...</li> </ul> </div>
         </div>
         <h2>API Info</h2>
-        <p>Send a POST request to <code>/api/send_sms</code> with JSON data:</p> <pre>{ "number": "+1234567890", "message": "Your alert!" }</pre>
-        <p>Get received SMS via GET request to <code>/api/get_sms</code>.</p> <p>Listen for new SMS at <code>/stream</code> (SSE).</p>
+        <p>Send a POST request to <code>{{ request.script_root }}/api/send_sms</code> with JSON data:</p> <pre>{ "number": "+1234567890", "message": "Your alert!" }</pre>
+        <p>Get received SMS via GET request to <code>{{ request.script_root }}/api/get_sms</code>.</p> <p>Listen for new SMS at <code>{{ request.script_root }}/stream</code> (SSE).</p>
         <p>SMS messages are logged to <code>{{ csv_file_path }}</code>.</p>
     </div>
 </body>
