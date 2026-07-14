@@ -43,12 +43,17 @@ on direct-port access, so both paths work.
 
 ## Home Assistant (`homeassistant/`)
 
-A YAML-configured custom integration (`custom_components/soundserver/`) registering
-`soundserver.play` / `speak` / `set_volume` services that call the HTTP API, plus a
-`rest_command` package alternative. It targets the API base URL (usually
-`http://<pi>/sound`). If you add or rename an API endpoint, update the service
-handlers in `__init__.py` and `services.yaml`. It's an *integration*, not a
-Supervisor add-on (the sound server needs the Pi's ALSA/serial hardware directly).
+A **config-entry** custom integration (`custom_components/soundserver/`, UI setup via
+`config_flow.py`). Layout: `const.py` (DOMAIN/PLATFORMS), `coordinator.py`
+(`SoundServerApi` HTTP client + `SoundServerCoordinator` polling `/api/speakers`),
+`media_player.py` (one `MediaPlayerEntity` per discovered speaker — `play_media` +
+`browse_media` over `/api/sounds` + `volume_set`, and the `soundserver.play`/`speak`
+entity services), `__init__.py` (`async_setup_entry`/`async_unload_entry` +
+`refresh_speakers` service). Speakers are entities so the UI gives dropdowns; sounds
+come from the media browser. If you add/rename an API endpoint, update `SoundServerApi`
+and the entity methods. Also a `rest_command` **package** alternative. It's an
+*integration*, not a Supervisor add-on (the server needs the Pi's ALSA/serial hardware).
+Can't be unit-tested without a running HA — validate on a real instance.
 
 ## Architecture patterns to preserve
 

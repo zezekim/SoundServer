@@ -193,16 +193,18 @@ too, so `http://<pi>:5000` etc. keep working for existing clients.
 
 ## Home Assistant integration
 
-`homeassistant/` provides a drop-in **custom integration** that adds
-`soundserver.play`, `soundserver.speak`, and `soundserver.set_volume` services
-(plus a `rest_command` package alternative). Point it at `http://<pi>/sound` and
-call it from automations. See [`homeassistant/README.md`](homeassistant/README.md).
+`homeassistant/` provides a drop-in **custom integration** — add it from the HA
+UI (point it at `http://<pi>/sound`) and every speaker becomes a `media_player`
+entity, so you pick speakers from dropdowns and browse the sound library from the
+media browser. A `rest_command` package alternative is also included. See
+[`homeassistant/README.md`](homeassistant/README.md).
 
 ```yaml
 service: soundserver.speak
+target:
+  entity_id: media_player.outdoor_dev_0
 data:
   text: "Someone is at the gate"
-  speaker: "2,0"
 ```
 
 ### Preparing sounds

@@ -1,0 +1,44 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SoundServer",
+        "description": "Enter the base URL of your SoundServer (e.g. http://10.0.14.50/sound).",
+        "data": {
+          "url": "URL",
+          "name": "Name"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach a SoundServer at that URL."
+    },
+    "abort": {
+      "already_configured": "This SoundServer is already configured."
+    }
+  },
+  "services": {
+    "play": {
+      "name": "Play sound",
+      "description": "Play a sound file from the library on one or more speakers.",
+      "fields": {
+        "sound": { "name": "Sound", "description": "The .wav file to play." },
+        "count": { "name": "Repeat", "description": "How many times to play it (1-20)." },
+        "background": { "name": "Background", "description": "Optional background sound to mix underneath." }
+      }
+    },
+    "speak": {
+      "name": "Speak text",
+      "description": "Convert text to speech and play it on one or more speakers.",
+      "fields": {
+        "text": { "name": "Text", "description": "What to say." },
+        "lang": { "name": "Language", "description": "gTTS language code." },
+        "background": { "name": "Background", "description": "Optional background sound to mix underneath." }
+      }
+    },
+    "refresh_speakers": {
+      "name": "Refresh speakers",
+      "description": "Re-query the Sound Server for its speaker list."
+    }
+  }
+}

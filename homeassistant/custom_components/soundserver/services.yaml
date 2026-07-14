@@ -1,26 +1,21 @@
 play:
   name: Play sound
-  description: Play a sound file from the SoundServer library on a speaker.
+  description: Play a sound file from the library on one or more speakers.
+  target:
+    entity:
+      integration: soundserver
+      domain: media_player
   fields:
     sound:
       name: Sound
-      description: The .wav file to play (see the Sound Server library / GET /api/sounds).
+      description: The .wav file to play. Tip; browse the library from the media player card to see the full list.
       required: true
       example: detected_garage.wav
       selector:
         text:
-    speaker:
-      name: Speaker
-      description: >-
-        Speaker friendly name (auto-discovered, e.g. "Outdoor (Dev 0)") or raw id
-        (e.g. "2,0"). Falls back to default_speaker if omitted. See
-        sensor.soundserver_speakers for the discovered list.
-      example: Outdoor (Dev 0)
-      selector:
-        text:
     count:
       name: Repeat
-      description: How many times to play it (1–20).
+      description: How many times to play it (1-20).
       default: 1
       selector:
         number:
@@ -36,7 +31,11 @@ play:
 
 speak:
   name: Speak text
-  description: Convert text to speech and play it on a speaker.
+  description: Convert text to speech and play it on one or more speakers.
+  target:
+    entity:
+      integration: soundserver
+      domain: media_player
   fields:
     text:
       name: Text
@@ -45,15 +44,7 @@ speak:
       example: Someone is at the gate
       selector:
         text:
-    speaker:
-      name: Speaker
-      description: >-
-        Speaker friendly name (auto-discovered, e.g. "Outdoor (Dev 0)") or raw id
-        (e.g. "2,0"). Falls back to default_speaker if omitted. See
-        sensor.soundserver_speakers for the discovered list.
-      example: Outdoor (Dev 0)
-      selector:
-        text:
+        multiline: true
     lang:
       name: Language
       description: gTTS language code.
@@ -67,35 +58,6 @@ speak:
       selector:
         text:
 
-set_volume:
-  name: Set volume
-  description: Set a mixer control's volume on a sound card.
-  fields:
-    card:
-      name: Card
-      description: ALSA card index (e.g. "2").
-      required: true
-      example: "2"
-      selector:
-        text:
-    control:
-      name: Control
-      description: Mixer control name.
-      default: Speaker
-      example: Speaker
-      selector:
-        text:
-    volume:
-      name: Volume
-      description: Volume percentage (0–100).
-      required: true
-      selector:
-        number:
-          min: 0
-          max: 100
-          unit_of_measurement: "%"
-
 refresh_speakers:
   name: Refresh speakers
-  description: Re-query the Sound Server for its speaker list (updates sensor.soundserver_speakers).
-
+  description: Re-query the Sound Server for its speaker list (adds any newly-created speakers).

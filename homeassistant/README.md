@@ -1,8 +1,9 @@
 # SoundServer × Home Assistant
 
 Two ways to drive SoundServer from Home Assistant. The **custom integration** is
-recommended (native services with a UI); the **rest_command package** is a
-no-custom-component alternative.
+recommended — UI setup, speakers as `media_player` entities, and the sound library
+in the media browser. The **rest_command package** is a no-custom-component
+alternative.
 
 Both assume SoundServer is reachable — ideally through the Caddy portal at
 `http://<pi>/sound` (everything on port 80), or directly at `http://<pi>:5000`.
@@ -11,63 +12,65 @@ Both assume SoundServer is reachable — ideally through the Caddy portal at
 
 ## Option A — Custom integration (recommended)
 
-Adds three services: `soundserver.play`, `soundserver.speak`,
-`soundserver.set_volume`, with field descriptions in the Developer Tools UI.
+Every speaker becomes a **`media_player` entity**, so you pick speakers from
+dropdowns, get a volume slider, and browse the sound library from the media
+browser — all in the UI, no YAML.
 
 ### Install
 
-1. Copy the component into your HA config folder:
+1. Copy `homeassistant/custom_components/soundserver/` from this repo into your HA
+   config folder, so that `<config>/custom_components/soundserver/manifest.json`
+   exists.
+2. Restart Home Assistant.
+3. Go to **Settings → Devices & Services → Add Integration**, search
+   **SoundServer**, and enter its URL when prompted:
    ```
-   <config>/custom_components/soundserver/
-   ```
-   (i.e. copy `homeassistant/custom_components/soundserver/` from this repo so
-   that `<config>/custom_components/soundserver/manifest.json` exists.)
-
-2. Add to `configuration.yaml`:
-   ```yaml
-   soundserver:
-     url: "http://10.0.14.50/sound"   # your Pi, via the Caddy portal
-     default_speaker: "Outdoor"       # optional — name or id, used when a call omits `speaker`
+   http://10.0.14.50/sound      # your Pi, via the Caddy portal (or http://10.0.14.50:5000)
    ```
 
-3. Restart Home Assistant.
+That's it. The integration connects, and each speaker shows up as a media player
+like `media_player.outdoor_dev_0`, grouped under one **SoundServer** device.
 
-### Speakers are auto-discovered
+### Dropdowns everywhere
 
-The integration polls `GET /api/speakers` every 5 minutes, so you can address a
-speaker by its **friendly name** (e.g. `Outdoor (Dev 0)`) *or* its raw id
-(e.g. `2,0`) — whichever you pass to `speaker`/`default_speaker` is resolved to
-the right id automatically.
-
-- The discovered list shows up as **`sensor.soundserver_speakers`** — its state is
-  the count, and its attributes (`speakers`, `ids`, `names`) list them. Handy for a
-  dropdown helper or just to see what's available in Developer Tools → States.
-- Added a speaker on the Pi? Call **`soundserver.refresh_speakers`** to pick it up
-  immediately instead of waiting for the next poll.
+- **Speakers** are entities, so anywhere you target one — the `soundserver.play` /
+  `soundserver.speak` services, a media-player card, `media_player.*` services —
+  you get an **entity dropdown** of your speakers by name.
+- **Sounds** are pickable from the **media browser**: add a *Media Control* card
+  for a speaker (or open the Media panel), click browse, and choose from the live
+  library. `media_player.play_media` fills the sound in for you.
+- **Volume**: the media-player card's slider maps to the speaker's mixer.
+- New speaker on the Pi? It appears automatically within ~5 min, or call
+  **`soundserver.refresh_speakers`** to pick it up now.
 
 ### Use it
 
 ```yaml
-# Announce a detection with a repeat and a background bed
+# Announce a detection (speaker chosen from the entity dropdown in the UI)
 service: soundserver.play
+target:
+  entity_id: media_player.outdoor_dev_0
 data:
   sound: detected_garage.wav
-  speaker: "Outdoor (Dev 0)"   # friendly name or raw id ("2,0") both work
   count: 2
   background: sprinkler.wav
 
-# Text-to-speech
+# Text-to-speech to several speakers at once
 service: soundserver.speak
+target:
+  entity_id:
+    - media_player.outdoor_dev_0
+    - media_player.indoor_dev_0
 data:
   text: "Someone is at the front gate"
-  # speaker omitted -> uses default_speaker
 
-# Set a speaker's volume
-service: soundserver.set_volume
+# Or play via the native media_player action (sound comes from the browser)
+service: media_player.play_media
+target:
+  entity_id: media_player.outdoor_dev_0
 data:
-  card: "2"
-  control: Speaker
-  volume: 80
+  media_content_type: music
+  media_content_id: welcome.wav
 ```
 
 Example automation:
@@ -81,6 +84,8 @@ automation:
         to: "on"
     action:
       - service: soundserver.speak
+        target:
+          entity_id: media_player.outdoor_dev_0
         data:
           text: "Someone is at the gate"
 ```
