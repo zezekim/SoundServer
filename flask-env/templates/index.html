@@ -136,6 +136,28 @@
         #toast.error { background: var(--red); color: #fff; }
         .empty-state { color: var(--muted); text-align: center; padding: 24px; font-size: .9rem; }
         code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+
+        /* --- API tab --- */
+        .api-intro { color: var(--muted); font-size: .84rem; line-height: 1.5; margin: 0 0 14px; }
+        .api-ep { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+        .api-ep-head { padding: 10px 12px; background: var(--surface-2); }
+        .api-sig { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .api-method { font-size: .68rem; font-weight: 800; padding: 2px 7px; border-radius: 5px; letter-spacing: .03em; }
+        .api-method.get  { background: color-mix(in srgb, var(--green) 20%, transparent); color: var(--green); }
+        .api-method.post { background: color-mix(in srgb, var(--brand) 20%, transparent); color: var(--brand); }
+        .api-method.yaml { background: color-mix(in srgb, var(--amber) 22%, transparent); color: var(--amber); }
+        .api-path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; word-break: break-all; }
+        .api-desc { color: var(--muted); font-size: .8rem; margin: 7px 0 0; line-height: 1.45; }
+        .api-snip { position: relative; border-top: 1px solid var(--border); }
+        .api-snip-label { font-size: .66rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+            padding: 7px 12px 0; font-weight: 700; }
+        .api-snip pre { margin: 0; padding: 8px 70px 12px 12px; overflow-x: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; line-height: 1.5;
+            white-space: pre; }
+        .api-copy { position: absolute; top: 8px; right: 8px; background: var(--surface-2); border: 1px solid var(--border);
+            color: var(--text); border-radius: 7px; padding: 4px 10px; font-size: .74rem; font-weight: 600; cursor: pointer; }
+        .api-copy:hover { border-color: var(--brand); }
+        .api-copy.copied { background: var(--green); color: #fff; border-color: transparent; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 </head>
@@ -200,6 +222,7 @@
                 <button class="tab" data-tab="volume">🔊 Volume</button>
                 <button class="tab" data-tab="upload">⬆ Upload</button>
                 <button class="tab" data-tab="speakers">🔈 Speakers</button>
+                <button class="tab" data-tab="api">🔌 API</button>
             </div>
 
             <div class="tab-panel active" id="tab-speak">
@@ -256,6 +279,13 @@
                         <p class="empty-state">No sound cards detected.</p>
                     {% endif %}
                 </form>
+            </div>
+
+            <div class="tab-panel" id="tab-api">
+                <p class="api-intro">Ready-to-use HTTP API. Examples below are pre-filled with your
+                    server address and a real speaker &amp; sound — hit <strong>Copy</strong> and paste.
+                    They follow the <strong>speaker</strong> selected in the top bar.</p>
+                <div id="api-docs"></div>
             </div>
         </aside>
     </main>
@@ -539,6 +569,7 @@
             const sp = activeSpeakerSel.options[activeSpeakerSel.selectedIndex];
             $('speak-target-name').textContent = (sp && sp.value) ? sp.textContent : 'the selected speaker';
             $('speak-bg-note').textContent = activeBg() ? ` over “${activeBg()}”` : '';
+            buildApiDocs();   // keep copy-paste examples in sync with the selected speaker
         }
 
         // ---------- TTS ----------
@@ -588,6 +619,77 @@
                 } catch (e) { div.innerHTML += `<p class="empty-state">Could not load controls.</p>`; }
                 wrap.appendChild(div);
             }
+        }
+
+        // ---------- API docs ----------
+        // Works over plain HTTP (LAN): navigator.clipboard needs a secure context,
+        // so fall back to execCommand when it's unavailable.
+        function copyText(text, btn) {
+            const flash = () => {
+                const orig = btn.textContent; btn.classList.add('copied'); btn.textContent = 'Copied!';
+                setTimeout(() => { btn.classList.remove('copied'); btn.textContent = orig; }, 1200);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(flash).catch(() => legacyCopy(text, flash));
+            } else { legacyCopy(text, flash); }
+        }
+        function legacyCopy(text, done) {
+            const ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.focus(); ta.select();
+            try { document.execCommand('copy'); done(); }
+            catch (e) { showToast('Copy failed — select the text and copy manually.', 'error'); }
+            document.body.removeChild(ta);
+        }
+        const sampleSpeaker = () => activeSpeaker() || (allDevices[0] && allDevices[0].hw_id) || '2,0';
+        const sampleFile = (i) => allSoundFiles[i] || allSoundFiles[0] || 'welcome.wav';
+        const sampleCard = () => (allCardsForLabeling[0] && allCardsForLabeling[0].card_index) || '2';
+
+        function apiSnippet(label, code) {
+            const wrap = document.createElement('div'); wrap.className = 'api-snip';
+            const lab = document.createElement('div'); lab.className = 'api-snip-label'; lab.textContent = label;
+            const pre = document.createElement('pre'); pre.textContent = code;   // textContent = no HTML escaping worries
+            const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'api-copy'; btn.textContent = 'Copy';
+            btn.onclick = () => copyText(code, btn);
+            wrap.append(lab, pre, btn); return wrap;
+        }
+        function apiEndpoint(method, path, desc, snippets) {
+            const ep = document.createElement('div'); ep.className = 'api-ep';
+            const head = document.createElement('div'); head.className = 'api-ep-head';
+            const sig = document.createElement('div'); sig.className = 'api-sig';
+            const m = document.createElement('span'); m.className = 'api-method ' + method.toLowerCase(); m.textContent = method;
+            const p = document.createElement('span'); p.className = 'api-path'; p.textContent = path;
+            sig.append(m, p);
+            const d = document.createElement('p'); d.className = 'api-desc'; d.textContent = desc;
+            head.append(sig, d); ep.appendChild(head);
+            snippets.forEach(s => ep.appendChild(apiSnippet(s[0], s[1])));
+            return ep;
+        }
+        function buildApiDocs() {
+            const box = $('api-docs'); if (!box) return;
+            const base = location.origin, spk = sampleSpeaker(), card = sampleCard();
+            const f = encodeURIComponent(sampleFile(0)), bg = encodeURIComponent(sampleFile(1));
+            box.innerHTML = '';
+            box.appendChild(apiEndpoint('GET', '/play/{speaker}/{sound}[/{count}]',
+                'Queue a sound on a speaker. Optional repeat count (1–20) and ?background=<sound> bed.', [
+                ['Play once — paste in a browser', `${base}/play/${spk}/${f}`],
+                ['Play with curl', `curl "${base}/play/${spk}/${f}"`],
+                ['Repeat ×3 over a background', `curl "${base}/play/${spk}/${f}/3?background=${bg}"`],
+            ]));
+            box.appendChild(apiEndpoint('POST', '/api/speak',
+                'Text-to-speech on a speaker. JSON body: text, speaker_id, optional lang & background_sound.', [
+                ['curl', `curl -X POST "${base}/api/speak" \\\n  -H "Content-Type: application/json" \\\n  -d '{"text":"Someone is at the gate","speaker_id":"${spk}","lang":"en"}'`],
+            ]));
+            box.appendChild(apiEndpoint('GET', '/api/speakers',
+                'List speakers and their IDs — use an id as {speaker} above.', [['curl', `curl "${base}/api/speakers"`]]));
+            box.appendChild(apiEndpoint('GET', '/api/sounds',
+                'List the available sound files — use a name as {sound}.', [['curl', `curl "${base}/api/sounds"`]]));
+            box.appendChild(apiEndpoint('POST', '/api/set_volume/{card}/{control}/{percent}',
+                'Set a mixer volume (0–100).', [['curl', `curl -X POST "${base}/api/set_volume/${card}/Speaker/80"`]]));
+            box.appendChild(apiEndpoint('YAML', 'Home Assistant · rest_command',
+                'Add to configuration.yaml, then call rest_command.soundserver_play / _speak from an automation.', [
+                ['configuration.yaml', `rest_command:\n  soundserver_play:\n    url: "${base}/play/${spk}/{{ sound }}"\n    method: GET\n  soundserver_speak:\n    url: "${base}/api/speak"\n    method: POST\n    content_type: "application/json"\n    payload: '{"text": "{{ text }}", "speaker_id": "${spk}"}'`],
+            ]));
         }
 
         // ---------- Init ----------
