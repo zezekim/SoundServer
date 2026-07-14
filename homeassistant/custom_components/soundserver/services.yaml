@@ -11,8 +11,11 @@ play:
         text:
     speaker:
       name: Speaker
-      description: 'Speaker/device id, e.g. "2,0". Falls back to default_speaker if omitted.'
-      example: "2,0"
+      description: >-
+        Speaker friendly name (auto-discovered, e.g. "Outdoor (Dev 0)") or raw id
+        (e.g. "2,0"). Falls back to default_speaker if omitted. See
+        sensor.soundserver_speakers for the discovered list.
+      example: Outdoor (Dev 0)
       selector:
         text:
     count:
@@ -44,8 +47,11 @@ speak:
         text:
     speaker:
       name: Speaker
-      description: 'Speaker/device id, e.g. "2,0". Falls back to default_speaker if omitted.'
-      example: "2,0"
+      description: >-
+        Speaker friendly name (auto-discovered, e.g. "Outdoor (Dev 0)") or raw id
+        (e.g. "2,0"). Falls back to default_speaker if omitted. See
+        sensor.soundserver_speakers for the discovered list.
+      example: Outdoor (Dev 0)
       selector:
         text:
     lang:
@@ -88,3 +94,8 @@ set_volume:
           min: 0
           max: 100
           unit_of_measurement: "%"
+
+refresh_speakers:
+  name: Refresh speakers
+  description: Re-query the Sound Server for its speaker list (updates sensor.soundserver_speakers).
+

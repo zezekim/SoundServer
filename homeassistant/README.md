@@ -27,12 +27,23 @@ Adds three services: `soundserver.play`, `soundserver.speak`,
    ```yaml
    soundserver:
      url: "http://10.0.14.50/sound"   # your Pi, via the Caddy portal
-     default_speaker: "2,0"           # optional — used when a call omits `speaker`
+     default_speaker: "Outdoor"       # optional — name or id, used when a call omits `speaker`
    ```
-   > Find speaker ids in the Sound Server dashboard (API tab → `GET /api/speakers`)
-   > or at `http://<pi>/sound/api/speakers`.
 
 3. Restart Home Assistant.
+
+### Speakers are auto-discovered
+
+The integration polls `GET /api/speakers` every 5 minutes, so you can address a
+speaker by its **friendly name** (e.g. `Outdoor (Dev 0)`) *or* its raw id
+(e.g. `2,0`) — whichever you pass to `speaker`/`default_speaker` is resolved to
+the right id automatically.
+
+- The discovered list shows up as **`sensor.soundserver_speakers`** — its state is
+  the count, and its attributes (`speakers`, `ids`, `names`) list them. Handy for a
+  dropdown helper or just to see what's available in Developer Tools → States.
+- Added a speaker on the Pi? Call **`soundserver.refresh_speakers`** to pick it up
+  immediately instead of waiting for the next poll.
 
 ### Use it
 
@@ -41,7 +52,7 @@ Adds three services: `soundserver.play`, `soundserver.speak`,
 service: soundserver.play
 data:
   sound: detected_garage.wav
-  speaker: "2,0"
+  speaker: "Outdoor (Dev 0)"   # friendly name or raw id ("2,0") both work
   count: 2
   background: sprinkler.wav
 
